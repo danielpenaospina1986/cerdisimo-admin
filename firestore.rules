@@ -1,0 +1,24 @@
+rules_version = '2';
+
+// Solo entran las cuentas de Google que estén en la colección "socios"
+// (un documento por socio cuyo ID es su correo, por ejemplo socios/nombre@gmail.com).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function esSocio() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/socios/$(request.auth.token.email));
+    }
+
+    // Cada quien puede comprobar si está autorizado; nadie edita la lista desde la app.
+    match /socios/{correo} {
+      allow read: if request.auth != null && request.auth.token.email == correo;
+      allow write: if false;
+    }
+
+    match /clientes/{id}    { allow read, write: if esSocio(); }
+    match /pedidos/{id}     { allow read, write: if esSocio(); }
+    match /movimientos/{id} { allow read, write: if esSocio(); }
+    match /config/{id}      { allow read, write: if esSocio(); }
+  }
+}

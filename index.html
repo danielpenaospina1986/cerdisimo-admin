@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Cerdísimo Admin</title>
+  <meta name="theme-color" content="#9a4526">
+  <link rel="icon" href="assets/icono.png">
+  <link rel="apple-touch-icon" href="assets/icono.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Luckiest+Guy&family=Shrikhand&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="cabecera">
+    <div class="cabecera-in">
+      <img class="logo" src="assets/logo.png" alt="Cerdísimo Chancho">
+      <div class="marca">
+        <p class="marca-t cc-outline-sm">Cerdísimo</p>
+        <p class="marca-s">Administración</p>
+      </div>
+      <button class="btn-mini" id="salir" hidden>Salir</button>
+    </div>
+    <nav class="pestanas" role="tablist">
+      <button role="tab" data-vista="entregas" aria-selected="true">Entregas</button>
+      <button role="tab" data-vista="contabilidad" aria-selected="false">Contabilidad</button>
+      <button role="tab" data-vista="clientes" aria-selected="false">Clientes</button>
+    </nav>
+  </header>
+
+  <p class="aviso" id="aviso-prueba" hidden>Modo prueba: los datos se guardan solo en este navegador. Pega la configuración de Firebase en <code>firebase-config.js</code> para usar la base de datos compartida.</p>
+
+  <main>
+    <div class="cargando" id="cargando">Cargando…</div>
+
+    <!-- ===== 1. Entregas ===== -->
+    <section class="vista" id="vista-entregas" hidden>
+      <div class="barra">
+        <button class="btn-mini" id="v-ant" aria-label="Viernes anterior">◀</button>
+        <div class="barra-t">
+          <p class="eyebrow">Siguientes entregas</p>
+          <h1 class="titulo" id="v-titulo">Viernes</h1>
+        </div>
+        <button class="btn-mini" id="v-sig" aria-label="Viernes siguiente">▶</button>
+      </div>
+      <div class="chips" id="v-resumen"></div>
+      <button class="btn btn-grande" id="btn-crear">+ Crear pedido</button>
+      <div class="mapa-caja">
+        <div id="mapa" class="mapa"></div>
+        <div class="leyenda"><span class="punto verde"></span> Pagado <span class="punto rojo"></span> Pendiente de pago</div>
+      </div>
+      <div class="acciones-ruta">
+        <a class="btn btn-sec" id="ruta-google" target="_blank" rel="noopener">Ruta en Google Maps</a>
+      </div>
+      <p class="nota" id="sin-pin"></p>
+      <div id="v-lista" class="lista"></div>
+      <div id="v-atrasados"></div>
+    </section>
+
+    <!-- ===== 2. Contabilidad ===== -->
+    <section class="vista" id="vista-contabilidad" hidden>
+      <div class="barra">
+        <div class="barra-t">
+          <p class="eyebrow">Contabilidad</p>
+          <h1 class="titulo" id="c-titulo">Mes</h1>
+        </div>
+        <input type="month" id="c-mes" class="campo campo-mes" aria-label="Mes">
+      </div>
+
+      <div class="tarjeta">
+        <h2 class="subtitulo">Resultado del mes</h2>
+        <dl class="cuentas" id="c-cuentas"></dl>
+        <p class="nota">Cuenta los pedidos pagados según su viernes de entrega. El costo del producto usa el costo por paquete y por litro de Precios y costos.</p>
+      </div>
+
+      <div class="grid2">
+        <div class="tarjeta destacada">
+          <h2 class="subtitulo">Fondo de gasolina</h2>
+          <dl class="cuentas" id="c-fondo"></dl>
+          <button class="btn btn-sec" data-mov="gasto" data-cat="Gasolina">Registrar tanqueada</button>
+        </div>
+        <div class="tarjeta">
+          <h2 class="subtitulo">Inversiones en el negocio</h2>
+          <p class="cifra" id="c-invertido">$0</p>
+          <button class="btn btn-sec" data-mov="inversion">Registrar inversión</button>
+        </div>
+      </div>
+
+      <h2 class="seccion">Ganancias de los socios</h2>
+      <div class="grid2" id="c-socios"></div>
+
+      <div class="botonera">
+        <button class="btn" data-mov="liquidacion">Liquidar</button>
+        <button class="btn btn-sec" data-mov="gasto">Registrar gasto</button>
+      </div>
+
+      <h2 class="seccion">Movimientos del mes</h2>
+      <div class="tabla-caja"><table class="tabla" id="c-movs"></table></div>
+
+      <h2 class="seccion">Pedidos del mes</h2>
+      <div class="tabla-caja"><table class="tabla" id="c-pedidos"></table></div>
+
+      <details class="tarjeta plegable">
+        <summary class="subtitulo">Precios y costos</summary>
+        <form id="f-precios" class="form"></form>
+      </details>
+    </section>
+
+    <!-- ===== 3. Clientes ===== -->
+    <section class="vista" id="vista-clientes" hidden>
+      <div class="barra">
+        <div class="barra-t">
+          <p class="eyebrow">Base de datos</p>
+          <h1 class="titulo">Clientes</h1>
+        </div>
+        <button class="btn btn-chico" id="btn-cliente-nuevo">+ Cliente</button>
+      </div>
+      <div class="filtros">
+        <input type="search" id="cl-buscar" class="campo" placeholder="Buscar por nombre, teléfono o dirección">
+        <select id="cl-orden" class="campo" aria-label="Ordenar">
+          <option value="nombre">Nombre</option>
+          <option value="pedidos">Más pedidos</option>
+          <option value="gastado">Más compras</option>
+          <option value="reciente">Pedido más reciente</option>
+        </select>
+      </div>
+      <div class="chips" id="cl-resumen"></div>
+      <div class="tabla-caja"><table class="tabla tabla-clientes" id="cl-tabla"></table></div>
+    </section>
+  </main>
+
+  <!-- Crear / editar pedido -->
+  <dialog id="d-pedido" class="dialogo">
+    <form method="dialog" id="f-pedido" class="form">
+      <h2 class="dialogo-t" id="d-pedido-t">Crear pedido</h2>
+      <label class="etq">Cliente
+        <input class="campo" id="p-cliente" list="lista-clientes" autocomplete="off" required placeholder="Escribe un nombre">
+      </label>
+      <datalist id="lista-clientes"></datalist>
+      <p class="nota" id="p-cliente-info"></p>
+      <div id="p-nuevo" class="sub-form" hidden>
+        <p class="nota fuerte">Cliente nuevo: se guardará en la base de datos.</p>
+        <label class="etq">Teléfono <input class="campo" id="p-tel" type="tel" inputmode="tel" placeholder="300 123 4567"></label>
+        <label class="etq">Dirección <input class="campo" id="p-dir" placeholder="Calle 10 # 43-20, apto 501, El Poblado"></label>
+      </div>
+      <div class="fila2">
+        <label class="etq">Fecha del pedido <input class="campo" id="p-fecha" type="date" required></label>
+        <label class="etq">Viernes de entrega <input class="campo" id="p-entrega" type="date" required></label>
+      </div>
+      <fieldset class="productos" id="p-productos"><legend class="etq">¿Qué pidió?</legend></fieldset>
+      <label class="check"><input type="checkbox" id="p-recoge"> Lo recoge (sin domicilio)</label>
+      <label class="check"><input type="checkbox" id="p-pagado"> Ya pagó</label>
+      <label class="etq">Notas <input class="campo" id="p-notas" placeholder="Opcional"></label>
+      <div class="total" id="p-total"></div>
+      <p class="error" id="p-error"></p>
+      <div class="botonera">
+        <button class="btn btn-sec" value="cancelar" formnovalidate>Cancelar</button>
+        <button class="btn" id="p-guardar" value="guardar">Guardar pedido</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Editar cliente -->
+  <dialog id="d-cliente" class="dialogo">
+    <form method="dialog" id="f-cliente" class="form">
+      <h2 class="dialogo-t" id="d-cliente-t">Cliente</h2>
+      <label class="etq">Nombre <input class="campo" id="k-nombre" required></label>
+      <label class="etq">Teléfono <input class="campo" id="k-tel" type="tel" inputmode="tel" placeholder="300 123 4567"></label>
+      <label class="etq">Dirección <input class="campo" id="k-dir" placeholder="Calle 10 # 43-20, El Poblado"></label>
+      <label class="etq">Indicaciones <input class="campo" id="k-notas" placeholder="Apto, portería, punto de referencia"></label>
+      <div class="fila-btn">
+        <button type="button" class="btn btn-sec btn-chico" id="k-buscar">Ubicar dirección en el mapa</button>
+        <span class="nota" id="k-estado"></span>
+      </div>
+      <div id="k-mapa" class="mapa mapa-chico"></div>
+      <p class="nota">Si el pin quedó mal, arrástralo o toca el mapa en el punto exacto.</p>
+      <p class="error" id="k-error"></p>
+      <div class="botonera">
+        <button type="button" class="btn btn-peligro btn-chico" id="k-borrar">Borrar</button>
+        <button class="btn btn-sec" value="cancelar" formnovalidate>Cancelar</button>
+        <button class="btn" value="guardar">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Movimiento: gasto, liquidación o inversión -->
+  <dialog id="d-mov" class="dialogo">
+    <form method="dialog" id="f-mov" class="form">
+      <h2 class="dialogo-t" id="d-mov-t">Movimiento</h2>
+      <label class="etq" id="m-socio-l">Socio
+        <select class="campo" id="m-socio"></select>
+      </label>
+      <label class="etq" id="m-cat-l">Categoría
+        <select class="campo" id="m-cat">
+          <option>Gasolina</option><option>Insumos</option><option>Empaques</option><option>Publicidad</option><option>Otro</option>
+        </select>
+      </label>
+      <label class="etq">Monto
+        <input class="campo" id="m-monto" inputmode="numeric" required placeholder="$0">
+      </label>
+      <div class="fila-btn" id="m-todo-caja"><button type="button" class="btn btn-sec btn-chico" id="m-todo">Liquidar todo</button><span class="nota" id="m-disp"></span></div>
+      <label class="etq">Fecha <input class="campo" id="m-fecha" type="date" required></label>
+      <label class="etq">Descripción <input class="campo" id="m-desc" placeholder="Opcional"></label>
+      <p class="nota" id="m-ayuda"></p>
+      <p class="error" id="m-error"></p>
+      <div class="botonera">
+        <button class="btn btn-sec" value="cancelar" formnovalidate>Cancelar</button>
+        <button class="btn" value="guardar">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="d-login" class="dialogo">
+    <div class="form">
+      <h2 class="dialogo-t">Entrar</h2>
+      <p>Entra con la cuenta de Google de Daniel o de Mariana.</p>
+      <button class="btn" id="login-btn">Entrar con Google</button>
+    </div>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
