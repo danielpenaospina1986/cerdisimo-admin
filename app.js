@@ -148,10 +148,14 @@ function pintarEntregas() {
   // Paradas con pin en orden de reparto, numeradas igual en la lista y el mapa. El número no
   // cambia al marcar entregas; solo se reordena con "Actualizar puntos".
   const conPin = paradasDelViernes(v);
-  const { orden, sueltas } = ordenDeReparto(conPin, v);
-  const numero = new Map();
-  orden.forEach((x, i) => { if (!x.pedido.entregado) numero.set(x.pedido.id, i + 1); });
-  const ruta = orden.filter((x) => !x.pedido.entregado);
+  const reparto = ordenDeReparto(conPin, v);
+  const sueltas = reparto.sueltas;
+  const numero = new Map(), lugar = new Map();
+  reparto.orden.forEach((x, i) => {
+    lugar.set(x.pedido.id, i);
+    if (!x.pedido.entregado) numero.set(x.pedido.id, reparto.numero.get(x.pedido.id));
+  });
+  const ruta = reparto.orden.filter((x) => !x.pedido.entregado);
 
   if (capaPines) {
     capaPines.clearLayers();
@@ -186,7 +190,7 @@ function pintarEntregas() {
     : "";
 
   $("#v-lista").innerHTML = delDia.length
-    ? delDia.slice().sort((a, b) => (!!a.entregado - !!b.entregado) || ((numero.get(a.id) || 1e9) - (numero.get(b.id) || 1e9)))
+    ? delDia.slice().sort((a, b) => (!!a.entregado - !!b.entregado) || ((lugar.get(a.id) ?? 1e9) - (lugar.get(b.id) ?? 1e9)))
       .map((p) => tarjetaPedido(p, numero.get(p.id))).join("")
     : '<p class="nota">No hay pedidos para este viernes.</p>';
 
@@ -209,10 +213,16 @@ function paradasDelViernes(v) {
 $("#actualizar-puntos").addEventListener("click", async () => {
   const b = $("#actualizar-puntos");
   const v = ui.viernes;
-  const cambios = ordenarDesdeElNorte(paradasDelViernes(v))
+  const paradas = ordenarDesdeElNorte(paradasDelViernes(v));
+  const ids = new Set(paradas.map((x) => x.pedido.id));
+  const cambios = paradas
     .map((x, i) => ({ id: x.pedido.id, antes: x.pedido.ruta, ruta: { viernes: v, orden: i + 1, lat: x.lat, lng: x.lng } }))
     .filter((c) => !c.antes || ["viernes", "orden", "lat", "lng"].some((k) => c.antes[k] !== c.ruta[k]))
-    .map((c) => ["actualizar", "pedidos", c.id, { ruta: c.ruta }]);
+    .map((c) => ["actualizar", "pedidos", c.id, { ruta: c.ruta }])
+    // Pedidos que tenían lugar en esta ruta y ya no son parada (cambiaron de viernes, los
+    // recogen o se quedaron sin pin): se les quita para que no choquen si vuelven
+    .concat(datos.pedidos.filter((p) => p.ruta && p.ruta.viernes === v && !ids.has(p.id))
+      .map((p) => ["actualizar", "pedidos", p.id, { ruta: null }]));
   clearTimeout(b._listo);
   b.textContent = "Puntos actualizados ✓";
   b._listo = setTimeout(() => { b.textContent = "Actualizar puntos"; }, 2500);

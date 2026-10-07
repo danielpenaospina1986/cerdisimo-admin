@@ -161,18 +161,34 @@ export function ordenarDesdeElNorte(paradas) {
   return [norte].concat(ordenarRuta(paradas.filter((p) => p !== norte), norte));
 }
 
-// Orden de las paradas de un viernes ({ ...cliente, pedido }). Si ya se guardó con "Actualizar
-// puntos" se respeta ese orden, y las paradas nuevas o con el pin movido van al final (de la más
-// cercana a la última en adelante). Si no hay nada guardado, se ordena desde el norte.
+// Orden de las paradas de un viernes ({ ...cliente, pedido }) y el número de cada una.
+// Si ya se guardó con "Actualizar puntos" se respetan ese orden y esos números (aunque una
+// parada salga del viernes, las demás no cambian de número). Las paradas nuevas o con el pin
+// movido van al final, de la más cercana a la última en adelante. Una entregada conserva su
+// lugar aunque le corrijan el pin. Si no hay nada guardado, se ordena desde el norte.
 export function ordenDeReparto(paradas, viernes) {
   const guardado = (x) => {
     const r = x.pedido.ruta;
-    return r && r.viernes === viernes && r.lat === x.lat && r.lng === x.lng && Number.isFinite(r.orden) ? r.orden : null;
+    const mismoPin = r && (x.pedido.entregado || (r.lat === x.lat && r.lng === x.lng));
+    return r && r.viernes === viernes && mismoPin && Number.isFinite(r.orden) ? r.orden : null;
   };
-  const conOrden = paradas.filter((x) => guardado(x) !== null).sort((a, b) => guardado(a) - guardado(b));
-  const sueltas = paradas.filter((x) => guardado(x) === null);
-  if (!conOrden.length) return { orden: ordenarDesdeElNorte(sueltas), sueltas: 0 };
-  return { orden: conOrden.concat(ordenarRuta(sueltas, conOrden[conOrden.length - 1])), sueltas: sueltas.length };
+  const fijas = [], sueltas = [], usados = new Set();
+  paradas.filter((x) => guardado(x) !== null).sort((a, b) => guardado(a) - guardado(b)).forEach((x) => {
+    const n = guardado(x);
+    if (usados.has(n)) sueltas.push(x); else { usados.add(n); fijas.push(x); }
+  });
+  paradas.forEach((x) => { if (guardado(x) === null) sueltas.push(x); });
+  const numero = new Map();
+  if (!fijas.length) {
+    const orden = ordenarDesdeElNorte(sueltas);
+    orden.forEach((x, i) => numero.set(x.pedido.id, i + 1));
+    return { orden, numero, sueltas: 0 };
+  }
+  const resto = ordenarRuta(sueltas, fijas[fijas.length - 1]);
+  const ultimo = guardado(fijas[fijas.length - 1]);
+  fijas.forEach((x) => numero.set(x.pedido.id, guardado(x)));
+  resto.forEach((x, i) => numero.set(x.pedido.id, ultimo + i + 1));
+  return { orden: fijas.concat(resto), numero, sueltas: resto.length };
 }
 
 // Ruta de Google Maps desde la ubicación actual por todas las paradas (máximo 10 por enlace).
