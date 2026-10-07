@@ -565,7 +565,8 @@ function abrirMov(tipo, cat) {
   $("#m-socio-l").hidden = tipo === "gasto";
   $("#m-cat-l").hidden = tipo !== "gasto";
   $("#m-cat").value = cat || "Insumos";
-  $("#m-todo-caja").hidden = tipo !== "liquidacion";
+  $("#m-todo-caja").hidden = tipo === "gasto";
+  $("#m-todo").hidden = tipo !== "liquidacion";
   $("#m-monto").value = ""; $("#m-desc").value = ""; $("#m-fecha").value = hoyISO(); $("#m-error").textContent = "";
   $("#m-ayuda").textContent = {
     gasto: "La gasolina sale del fondo de gasolina. Los demás gastos se restan de la ganancia neta del mes.",
