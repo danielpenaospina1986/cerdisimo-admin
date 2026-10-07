@@ -2,7 +2,7 @@ import { crearStore, sembrarSiHaceFalta, modoPrueba } from "./store.js";
 import {
   PRODUCTOS, PRECIOS_BASE, SOCIOS, precios, calcularPedido, hoyISO, sumarDias, viernesDeEntrega, viernesActual,
   fechaLarga, fechaCorta, nombreMes, plata, leerPlata, resumenMes, saldos,
-  enlaceGoogle, enlaceApple, enlaceWhatsApp, ordenarRuta, enlaceRutaGoogle,
+  enlaceGoogle, enlaceApple, enlaceWhatsApp, ordenarDesdeElNorte, ordenDeReparto, enlaceRutaGoogle,
   necesidadesEntrega, viernesConPedidos
 } from "./negocio.js";
 
@@ -145,12 +145,13 @@ function pintarEntregas() {
     '<span class="chip verde">Pagado ' + plata(cobrado) + "</span>" +
     '<span class="chip rojo">Por cobrar ' + plata(porCobrar) + "</span>";
 
-  // Paradas con pin, ordenadas por cercanía, numeradas igual en la lista y el mapa
-  const conPin = delDia.filter((p) => !p.recoge && tienePin(cliente(p.clienteId)))
-    .map((p) => ({ ...cliente(p.clienteId), pedido: p }));
-  const ruta = ordenarRuta(conPin.filter((x) => !x.pedido.entregado));
+  // Paradas con pin en orden de reparto, numeradas igual en la lista y el mapa. El número no
+  // cambia al marcar entregas; solo se reordena con "Actualizar puntos".
+  const conPin = paradasDelViernes(v);
+  const { orden, sueltas } = ordenDeReparto(conPin, v);
   const numero = new Map();
-  ruta.forEach((x, i) => numero.set(x.pedido.id, i + 1));
+  orden.forEach((x, i) => { if (!x.pedido.entregado) numero.set(x.pedido.id, i + 1); });
+  const ruta = orden.filter((x) => !x.pedido.entregado);
 
   if (capaPines) {
     capaPines.clearLayers();
@@ -172,6 +173,12 @@ function pintarEntregas() {
   const rg = $("#ruta-google");
   if (urlRuta) { rg.href = urlRuta; rg.removeAttribute("aria-disabled"); } else { rg.removeAttribute("href"); rg.setAttribute("aria-disabled", "true"); }
   rg.textContent = ruta.length > 10 ? "Ruta en Google Maps (primeras 10)" : "Ruta en Google Maps";
+  const ap = $("#actualizar-puntos");
+  ap.disabled = !conPin.length;
+  $("#ruta-nota").textContent = sueltas
+    ? (sueltas === 1 ? "Hay 1 punto nuevo o movido" : "Hay " + sueltas + " puntos nuevos o movidos") +
+      " al final de la ruta: toca «Actualizar puntos» para reordenar."
+    : "";
 
   const faltan = delDia.filter((p) => !p.recoge && !tienePin(cliente(p.clienteId)));
   $("#sin-pin").textContent = faltan.length
@@ -179,7 +186,8 @@ function pintarEntregas() {
     : "";
 
   $("#v-lista").innerHTML = delDia.length
-    ? delDia.map((p) => tarjetaPedido(p, numero.get(p.id))).join("")
+    ? delDia.slice().sort((a, b) => (!!a.entregado - !!b.entregado) || ((numero.get(a.id) || 1e9) - (numero.get(b.id) || 1e9)))
+      .map((p) => tarjetaPedido(p, numero.get(p.id))).join("")
     : '<p class="nota">No hay pedidos para este viernes.</p>';
 
   const atrasados = datos.pedidos.filter((p) => p.fechaEntrega < v && (!p.entregado || !p.pagado) && v === viernesActual());
@@ -188,6 +196,29 @@ function pintarEntregas() {
       atrasados.sort((a, b) => a.fechaEntrega.localeCompare(b.fechaEntrega)).map((p) => tarjetaPedido(p)).join("") + "</div>"
     : "";
 }
+
+// Pedidos del viernes que van a domicilio y cuyo cliente tiene pin, como paradas del mapa
+function paradasDelViernes(v) {
+  return datos.pedidos.filter((p) => p.fechaEntrega === v && !p.recoge && tienePin(cliente(p.clienteId)))
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((p) => ({ ...cliente(p.clienteId), pedido: p }));
+}
+
+// Guarda el orden de reparto del viernes: desde el pin más al norte y luego el más cercano.
+// Queda guardado en cada pedido para que Daniel y Mariana vean los mismos números.
+$("#actualizar-puntos").addEventListener("click", async () => {
+  const b = $("#actualizar-puntos");
+  const v = ui.viernes;
+  const cambios = ordenarDesdeElNorte(paradasDelViernes(v))
+    .map((x, i) => ({ id: x.pedido.id, antes: x.pedido.ruta, ruta: { viernes: v, orden: i + 1, lat: x.lat, lng: x.lng } }))
+    .filter((c) => !c.antes || ["viernes", "orden", "lat", "lng"].some((k) => c.antes[k] !== c.ruta[k]))
+    .map((c) => ["actualizar", "pedidos", c.id, { ruta: c.ruta }]);
+  clearTimeout(b._listo);
+  b.textContent = "Puntos actualizados ✓";
+  b._listo = setTimeout(() => { b.textContent = "Actualizar puntos"; }, 2500);
+  try { if (cambios.length) await store.lote(cambios); }
+  catch (e) { clearTimeout(b._listo); b.textContent = "Actualizar puntos"; alert("No se pudieron actualizar los puntos: " + e.message); }
+});
 
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-acc]");

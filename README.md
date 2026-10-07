@@ -2,7 +2,7 @@
 
 App web (un solo HTML, sin instalar nada) para Daniel y Mariana, con cuatro tableros:
 
-1. **Entregas**: pedidos del viernes, mapa con pines (verde = pagado, rojo = pendiente), botón **Crear pedido**, enlaces a Google Maps y Mapas de iPhone por cliente y ruta completa en Google Maps.
+1. **Entregas**: pedidos del viernes, mapa con pines (verde = pagado, rojo = pendiente), botón **Crear pedido**, enlaces a Google Maps y Mapas de iPhone por cliente y ruta completa en Google Maps. El botón **Actualizar puntos** numera las paradas desde la más al norte (la producción sale de Girardota) y de ahí siempre a la más cercana; ese orden queda guardado en cada pedido, así Daniel y Mariana ven los mismos números y no cambian al marcar entregas. Los pedidos nuevos o con el pin movido quedan al final hasta que se vuelva a tocar el botón.
 2. **Contabilidad**: por mes, ventas cobradas, costo de producto, ganancia bruta, domicilios al fondo de gasolina, otros gastos y ganancia neta; reparto 50/50, liquidaciones totales o parciales, inversiones, tanqueadas e historial. Incluye el editor de precios y costos.
 3. **Clientes**: tabla editable (teléfono, dirección, pin), con cuántas veces y cada cuánto compra cada cliente.
 4. **Producción** (inventario): en tiempo real, cuántos paquetes de chorizos y cuántos litros de guaro hay que tener para la próxima entrega. Cuenta todos los pedidos de ese viernes, pagados o no; en la próxima entrega suma también los pedidos de viernes anteriores que no se han entregado. Muestra lo entregado y lo que falta, el detalle por producto y los próximos viernes.

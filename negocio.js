@@ -153,6 +153,28 @@ export function ordenarRuta(paradas, origen) {
   return ruta;
 }
 
+// Orden de reparto: arranca en la parada más al norte (la producción sale de Girardota, al norte
+// de Medellín) y de ahí sigue siempre a la más cercana.
+export function ordenarDesdeElNorte(paradas) {
+  if (!paradas.length) return [];
+  const norte = paradas.reduce((a, b) => (b.lat > a.lat ? b : a));
+  return [norte].concat(ordenarRuta(paradas.filter((p) => p !== norte), norte));
+}
+
+// Orden de las paradas de un viernes ({ ...cliente, pedido }). Si ya se guardó con "Actualizar
+// puntos" se respeta ese orden, y las paradas nuevas o con el pin movido van al final (de la más
+// cercana a la última en adelante). Si no hay nada guardado, se ordena desde el norte.
+export function ordenDeReparto(paradas, viernes) {
+  const guardado = (x) => {
+    const r = x.pedido.ruta;
+    return r && r.viernes === viernes && r.lat === x.lat && r.lng === x.lng && Number.isFinite(r.orden) ? r.orden : null;
+  };
+  const conOrden = paradas.filter((x) => guardado(x) !== null).sort((a, b) => guardado(a) - guardado(b));
+  const sueltas = paradas.filter((x) => guardado(x) === null);
+  if (!conOrden.length) return { orden: ordenarDesdeElNorte(sueltas), sueltas: 0 };
+  return { orden: conOrden.concat(ordenarRuta(sueltas, conOrden[conOrden.length - 1])), sueltas: sueltas.length };
+}
+
 // Ruta de Google Maps desde la ubicación actual por todas las paradas (máximo 10 por enlace).
 export function enlaceRutaGoogle(ruta) {
   if (!ruta.length) return null;
