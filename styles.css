@@ -80,8 +80,11 @@ code { font-size: 0.9em; }
   .pestanas { gap: 3px; }
   .pestanas button { font-size: 12.5px; letter-spacing: 0.02em; padding: 11px 7px 10px; }
 }
-@media (max-width: 380px) {
+@media (max-width: 384px) {
   .pestanas button { font-size: 11.5px; letter-spacing: 0; padding: 11px 5px 10px; }
+}
+@media (max-width: 340px) {
+  .pestanas button { font-size: 10.5px; padding: 11px 4px 10px; }
 }
 .pestanas button[aria-selected="true"] { background: var(--cream); color: var(--ink); border-color: var(--ink); }
 
@@ -249,12 +252,12 @@ code { font-size: 0.9em; }
   box-shadow: var(--shadow-lg); padding: 16px 16px 14px; min-width: 0;
 }
 .necesidad--destacada { background: var(--mustard); }
-.necesidad:nth-child(1) { transform: rotate(-0.6deg); }
-.necesidad:nth-child(2) { transform: rotate(0.5deg); }
 .necesidad-frase { margin: 0; font: 400 19px/1.2 var(--font-script); color: var(--rust-deep); text-wrap: balance; }
+.necesidad--destacada .necesidad-frase { color: var(--ink); }
 .necesidad-num { margin: 6px 0 0; font: 400 clamp(64px, 20vw, 88px)/1 var(--font-display); color: var(--rust); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
 .necesidad-unidad { margin: 4px 0 0; font: 800 17px/1.2 var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; }
 .necesidad-det { margin: 6px 0 0; font-size: 14px; font-weight: 700; color: #4a3a30; text-wrap: balance; }
 .necesidad-det:empty { display: none; }
 .tabla tr.sel td { background: var(--mustard); }
+.tabla tr[data-viernes]:focus-visible { outline: 3px solid var(--rust-deep); outline-offset: -3px; }
 .tabla tr.suma td { font-weight: 800; border-top: var(--stroke-md) solid var(--ink); }

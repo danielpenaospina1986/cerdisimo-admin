@@ -12,7 +12,7 @@ const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toL
 
 let store;
 let datos = { clientes: [], pedidos: [], movimientos: [], config: [] };
-const ui = { vista: "entregas", viernes: viernesActual(), viernesProd: viernesActual(), mes: hoyISO().slice(0, 7) };
+const ui = { vista: "entregas", viernes: viernesActual(), viernesProd: null, mes: hoyISO().slice(0, 7) };
 
 // ---------- Arranque ----------
 async function iniciar() {
@@ -635,18 +635,27 @@ $("#f-precios").addEventListener("submit", async (e) => {
 // =====================================================================
 // 4. INVENTARIO / PRODUCCIÓN
 // =====================================================================
-$("#pr-ant").onclick = () => { ui.viernesProd = sumarDias(ui.viernesProd, -7); pintarProduccion(); };
-$("#pr-sig").onclick = () => { ui.viernesProd = sumarDias(ui.viernesProd, 7); pintarProduccion(); };
-$("#pr-proximas").addEventListener("click", (e) => {
+// viernesProd null = la vista sigue sola a la próxima entrega, aunque la app quede abierta varios días
+const elegirViernesProd = (f) => { ui.viernesProd = f === viernesActual() ? null : f; pintarProduccion(); };
+$("#pr-ant").onclick = () => elegirViernesProd(sumarDias(ui.viernesProd || viernesActual(), -7));
+$("#pr-sig").onclick = () => elegirViernesProd(sumarDias(ui.viernesProd || viernesActual(), 7));
+function irAFila(e) {
   const tr = e.target.closest("tr[data-viernes]");
-  if (tr) { ui.viernesProd = tr.dataset.viernes; pintarProduccion(); window.scrollTo({ top: 0, behavior: "smooth" }); }
-});
+  if (!tr) return;
+  if (e.type === "keydown") { if (e.key !== "Enter" && e.key !== " ") return; e.preventDefault(); }
+  elegirViernesProd(tr.dataset.viernes);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+$("#pr-proximas").addEventListener("click", irAFila);
+$("#pr-proximas").addEventListener("keydown", irAFila);
+// Al volver a la app (p. ej. el sábado), repinta aunque no haya cambiado ningún pedido
+document.addEventListener("visibilitychange", () => { if (!document.hidden && $("#cargando").hidden) pintar(); });
 
 const plural = (n, uno, varios) => (n === 1 ? uno : varios);
 
 function pintarProduccion() {
-  const v = ui.viernesProd;
   const proxima = viernesActual();
+  const v = ui.viernesProd || proxima;
   const esProxima = v === proxima;
   const n = necesidadesEntrega(datos.pedidos, v, esProxima);
   $("#pr-titulo").textContent = fechaLarga(v);
@@ -665,7 +674,7 @@ function pintarProduccion() {
 
   $("#pr-litros").textContent = n.litros;
   $("#pr-litros-u").textContent = plural(n.litros, "litro de guaro", "litros de guaro");
-  const combos = n.porProducto.filter((x) => x.litros).map((x) => x.unidades + " " + x.nombre).join(" y ");
+  const combos = n.porProducto.filter((x) => x.litros).map((x) => x.unidades + " " + (x.unidades === 1 ? x.nombre : x.nombre.replace("Combo", "Combos"))).join(" y ");
   $("#pr-litros-det").textContent = n.litros
     ? "Aguardiente Antioqueño tapa roja · " + combos
     : "Ningún combo pedido para este viernes.";
@@ -693,7 +702,7 @@ function pintarProduccion() {
   $("#pr-proximas").innerHTML = "<thead><tr><th>Viernes</th><th class=num>Pedidos</th><th class=num>Paquetes</th><th class=num>Litros</th></tr></thead><tbody>" +
     viernes.map((f) => {
       const x = necesidadesEntrega(datos.pedidos, f, f === proxima);
-      return '<tr data-viernes="' + f + '"' + (f === v ? ' class="sel"' : "") + "><td>" + fechaCorta(f) + (f === proxima ? " <span class=\"tag verde\">próxima</span>" : "") +
+      return '<tr tabindex="0" data-viernes="' + f + '"' + (f === v ? ' class="sel" aria-current="true"' : "") + "><td>" + fechaCorta(f) + (f === proxima ? " <span class=\"tag verde\">próxima</span>" : "") +
         '</td><td class="num">' + x.pedidos.length + '</td><td class="num">' + x.paquetes + '</td><td class="num">' + x.litros + "</td></tr>";
     }).join("") + "</tbody>";
 }
