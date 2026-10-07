@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Actualizar costos</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#9a4526">
+  <link rel="icon" href="../assets/icono.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Luckiest+Guy&family=Shrikhand&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <!-- Página de mantenimiento de un solo uso: no está enlazada desde la app. -->
+  <header class="cabecera">
+    <div class="cabecera-in">
+      <img class="logo" src="../assets/logo.png" alt="Cerdísimo Chancho">
+      <div class="marca">
+        <p class="marca-t cc-outline-sm">Cerdísimo</p>
+        <p class="marca-s">Mantenimiento</p>
+      </div>
+    </div>
+  </header>
+
+  <p class="aviso" id="aviso-prueba" hidden>Modo prueba: los cambios se aplican solo a los datos de este navegador.</p>
+
+  <main>
+    <div class="cargando" id="cargando">Cargando…</div>
+
+    <section id="contenido" hidden>
+      <div class="barra">
+        <div class="barra-t">
+          <p class="eyebrow">Ajuste de un solo uso</p>
+          <h1 class="titulo">Costo de los pedidos</h1>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <p id="explicacion"></p>
+        <dl class="cuentas" id="resumen"></dl>
+      </div>
+
+      <div class="grid2" id="socios"></div>
+
+      <h2 class="seccion" id="tabla-t">Pedidos que cambian</h2>
+      <div class="tabla-caja"><table class="tabla" id="tabla"></table></div>
+
+      <p class="error" id="error"></p>
+      <p class="aviso" id="hecho" hidden></p>
+      <div class="botonera">
+        <a class="btn btn-sec" href="../">Volver a la app</a>
+        <button class="btn" id="aplicar" type="button">Actualizar</button>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="d-login" class="dialogo">
+    <div class="form">
+      <h2 class="dialogo-t">Entrar</h2>
+      <p>Entra con la cuenta de Google de Daniel o de Mariana.</p>
+      <button class="btn" id="login-btn">Entrar con Google</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="actualizar-costos.js"></script>
+</body>
+</html>
