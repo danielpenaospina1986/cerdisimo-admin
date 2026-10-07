@@ -162,3 +162,39 @@ export function enlaceRutaGoogle(ruta) {
   if (pts.length) url += "&waypoints=" + encodeURIComponent(pts.join("|"));
   return url;
 }
+
+// ---------- Inventario / producción ----------
+export const CHORIZOS_POR_PAQUETE = 5;
+
+// Lo que hay que tener listo para un viernes: todos sus pedidos (pagados o no, con domi o
+// para recoger). Si es la próxima entrega, suma también los pedidos de viernes anteriores
+// que siguen sin entregar, porque salen en ese mismo reparto.
+export function necesidadesEntrega(pedidos, viernes, conAtrasados) {
+  const delViernes = pedidos.filter((p) => p.fechaEntrega === viernes);
+  const atrasados = conAtrasados ? pedidos.filter((p) => p.fechaEntrega && p.fechaEntrega < viernes && !p.entregado) : [];
+  const todos = delViernes.concat(atrasados);
+  const sum = (arr, k) => arr.reduce((t, p) => t + (Number(p[k]) || 0), 0);
+  const porProducto = PRODUCTOS.map((prod) => {
+    const unidades = todos.reduce((t, p) => t + (Number((p.items || {})[prod.id]) || 0), 0);
+    return { ...prod, unidades, paquetes: unidades * prod.paquetes, litros: unidades * prod.litros };
+  }).filter((x) => x.unidades);
+  const porEntregar = todos.filter((p) => !p.entregado);
+  const paquetes = sum(todos, "paquetes");
+  return {
+    pedidos: todos,
+    paquetes,
+    litros: sum(todos, "litros"),
+    chorizos: paquetes * CHORIZOS_POR_PAQUETE,
+    porProducto,
+    atrasados: atrasados.length,
+    paquetesAtrasados: sum(atrasados, "paquetes"),
+    litrosAtrasados: sum(atrasados, "litros"),
+    porEntregar: { pedidos: porEntregar.length, paquetes: sum(porEntregar, "paquetes"), litros: sum(porEntregar, "litros") },
+    entregados: { pedidos: todos.length - porEntregar.length, paquetes: paquetes - sum(porEntregar, "paquetes"), litros: sum(todos, "litros") - sum(porEntregar, "litros") }
+  };
+}
+
+// Viernes desde `desde` (incluido) que tienen pedidos, en orden.
+export function viernesConPedidos(pedidos, desde) {
+  return [...new Set(pedidos.map((p) => p.fechaEntrega).filter((f) => f && f >= desde))].sort();
+}

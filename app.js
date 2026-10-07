@@ -2,7 +2,8 @@ import { crearStore, sembrarSiHaceFalta, modoPrueba } from "./store.js";
 import {
   PRODUCTOS, PRECIOS_BASE, SOCIOS, precios, calcularPedido, hoyISO, sumarDias, viernesDeEntrega, viernesActual,
   fechaLarga, fechaCorta, nombreMes, plata, leerPlata, resumenMes, saldos,
-  enlaceGoogle, enlaceApple, enlaceWhatsApp, ordenarRuta, enlaceRutaGoogle
+  enlaceGoogle, enlaceApple, enlaceWhatsApp, ordenarRuta, enlaceRutaGoogle,
+  necesidadesEntrega, viernesConPedidos
 } from "./negocio.js";
 
 const $ = (s) => document.querySelector(s);
@@ -11,7 +12,7 @@ const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toL
 
 let store;
 let datos = { clientes: [], pedidos: [], movimientos: [], config: [] };
-const ui = { vista: "entregas", viernes: viernesActual(), mes: hoyISO().slice(0, 7) };
+const ui = { vista: "entregas", viernes: viernesActual(), viernesProd: viernesActual(), mes: hoyISO().slice(0, 7) };
 
 // ---------- Arranque ----------
 async function iniciar() {
@@ -64,10 +65,11 @@ document.querySelectorAll(".pestanas button").forEach((b) => {
 });
 
 function pintar() {
-  ["entregas", "contabilidad", "clientes"].forEach((v) => { $("#vista-" + v).hidden = v !== ui.vista; });
+  ["entregas", "contabilidad", "clientes", "produccion"].forEach((v) => { $("#vista-" + v).hidden = v !== ui.vista; });
   if (ui.vista === "entregas") pintarEntregas();
   if (ui.vista === "contabilidad") pintarContabilidad();
   if (ui.vista === "clientes") pintarClientes();
+  if (ui.vista === "produccion") pintarProduccion();
 }
 
 const cliente = (id) => datos.clientes.find((c) => c.id === id);
@@ -629,5 +631,71 @@ $("#f-precios").addEventListener("submit", async (e) => {
   await store.fijar("config", "precios", doc);
   alert("Precios guardados.");
 });
+
+// =====================================================================
+// 4. INVENTARIO / PRODUCCIÓN
+// =====================================================================
+$("#pr-ant").onclick = () => { ui.viernesProd = sumarDias(ui.viernesProd, -7); pintarProduccion(); };
+$("#pr-sig").onclick = () => { ui.viernesProd = sumarDias(ui.viernesProd, 7); pintarProduccion(); };
+$("#pr-proximas").addEventListener("click", (e) => {
+  const tr = e.target.closest("tr[data-viernes]");
+  if (tr) { ui.viernesProd = tr.dataset.viernes; pintarProduccion(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+});
+
+const plural = (n, uno, varios) => (n === 1 ? uno : varios);
+
+function pintarProduccion() {
+  const v = ui.viernesProd;
+  const proxima = viernesActual();
+  const esProxima = v === proxima;
+  const n = necesidadesEntrega(datos.pedidos, v, esProxima);
+  $("#pr-titulo").textContent = fechaLarga(v);
+
+  const frase = esProxima ? "Para la próxima entrega debemos tener"
+    : v > proxima ? "Para el " + fechaLarga(v) + " debemos tener"
+    : "Para el " + fechaLarga(v) + " se necesitaron";
+  $("#pr-frase-paq").textContent = frase;
+  $("#pr-frase-lit").textContent = frase;
+
+  $("#pr-paquetes").textContent = n.paquetes;
+  $("#pr-paquetes-u").textContent = plural(n.paquetes, "paquete de chorizos", "paquetes de chorizos");
+  $("#pr-paquetes-det").textContent = n.pedidos.length
+    ? n.chorizos + " chorizos · " + n.pedidos.length + " " + plural(n.pedidos.length, "pedido", "pedidos")
+    : "Todavía no hay pedidos para este viernes.";
+
+  $("#pr-litros").textContent = n.litros;
+  $("#pr-litros-u").textContent = plural(n.litros, "litro de guaro", "litros de guaro");
+  const combos = n.porProducto.filter((x) => x.litros).map((x) => x.unidades + " " + x.nombre).join(" y ");
+  $("#pr-litros-det").textContent = n.litros
+    ? "Aguardiente Antioqueño tapa roja · " + combos
+    : "Ningún combo pedido para este viernes.";
+
+  const avance = [];
+  if (n.pedidos.length) {
+    avance.push('<span class="chip rojo">Por entregar: ' + n.porEntregar.paquetes + " paq. · " + n.porEntregar.litros + " L</span>");
+    avance.push('<span class="chip verde">Entregado: ' + n.entregados.paquetes + " paq. · " + n.entregados.litros + " L</span>");
+  }
+  $("#pr-avance").innerHTML = avance.join("");
+  $("#pr-nota").textContent = n.atrasados
+    ? "Incluye " + n.atrasados + " " + plural(n.atrasados, "pedido", "pedidos") + " de viernes anteriores que no se ha" + (n.atrasados === 1 ? "" : "n") +
+      " entregado (" + n.paquetesAtrasados + " paq." + (n.litrosAtrasados ? " y " + n.litrosAtrasados + " L" : "") + ")."
+    : "";
+
+  $("#pr-desglose").innerHTML = "<thead><tr><th>Producto</th><th class=num>Cantidad</th><th class=num>Paquetes</th><th class=num>Litros</th></tr></thead><tbody>" +
+    (n.porProducto.length
+      ? n.porProducto.map((x) => "<tr><td><strong>" + esc(x.nombre) + "</strong><br><small>" + esc(x.detalle) + '</small></td><td class="num">' + x.unidades +
+          '</td><td class="num">' + x.paquetes + '</td><td class="num">' + x.litros + "</td></tr>").join("") +
+        '<tr class="suma"><td>Total</td><td></td><td class="num">' + n.paquetes + '</td><td class="num">' + n.litros + "</td></tr>"
+      : '<tr class="vacia"><td colspan="4">Sin pedidos para este viernes.</td></tr>') + "</tbody>";
+
+  const viernes = viernesConPedidos(datos.pedidos, proxima);
+  if (!viernes.includes(proxima)) viernes.unshift(proxima);
+  $("#pr-proximas").innerHTML = "<thead><tr><th>Viernes</th><th class=num>Pedidos</th><th class=num>Paquetes</th><th class=num>Litros</th></tr></thead><tbody>" +
+    viernes.map((f) => {
+      const x = necesidadesEntrega(datos.pedidos, f, f === proxima);
+      return '<tr data-viernes="' + f + '"' + (f === v ? ' class="sel"' : "") + "><td>" + fechaCorta(f) + (f === proxima ? " <span class=\"tag verde\">próxima</span>" : "") +
+        '</td><td class="num">' + x.pedidos.length + '</td><td class="num">' + x.paquetes + '</td><td class="num">' + x.litros + "</td></tr>";
+    }).join("") + "</tbody>";
+}
 
 iniciar();

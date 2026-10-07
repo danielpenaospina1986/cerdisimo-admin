@@ -76,6 +76,13 @@ code { font-size: 0.9em; }
   border: var(--stroke-md) solid transparent; border-bottom: none;
   border-radius: 14px 14px 0 0; padding: 11px 12px 10px; cursor: pointer;
 }
+@media (max-width: 520px) {
+  .pestanas { gap: 3px; }
+  .pestanas button { font-size: 12.5px; letter-spacing: 0.02em; padding: 11px 7px 10px; }
+}
+@media (max-width: 380px) {
+  .pestanas button { font-size: 11.5px; letter-spacing: 0; padding: 11px 5px 10px; }
+}
 .pestanas button[aria-selected="true"] { background: var(--cream); color: var(--ink); border-color: var(--ink); }
 
 .aviso { max-width: 980px; margin: 12px auto 0; padding: 10px 14px; background: var(--mustard); border: var(--stroke-md) solid var(--ink); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); font-weight: 700; margin-left: 16px; margin-right: 16px; }
@@ -232,3 +239,22 @@ code { font-size: 0.9em; }
   .filtros { grid-template-columns: 1fr; }
   .mapa { height: 280px; }
 }
+
+/* Inventario / producción: tarjetas como la EtiquetaPrecio del sistema de diseño */
+.necesidades { display: grid; grid-template-columns: 1fr; gap: 18px; margin: 4px 0 18px; }
+@media (min-width: 680px) { .necesidades { grid-template-columns: 1fr 1fr; } }
+.necesidad {
+  position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px;
+  background: var(--paper); border: var(--stroke-lg) solid var(--ink); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg); padding: 16px 16px 14px; min-width: 0;
+}
+.necesidad--destacada { background: var(--mustard); }
+.necesidad:nth-child(1) { transform: rotate(-0.6deg); }
+.necesidad:nth-child(2) { transform: rotate(0.5deg); }
+.necesidad-frase { margin: 0; font: 400 19px/1.2 var(--font-script); color: var(--rust-deep); text-wrap: balance; }
+.necesidad-num { margin: 6px 0 0; font: 400 clamp(64px, 20vw, 88px)/1 var(--font-display); color: var(--rust); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+.necesidad-unidad { margin: 4px 0 0; font: 800 17px/1.2 var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; }
+.necesidad-det { margin: 6px 0 0; font-size: 14px; font-weight: 700; color: #4a3a30; text-wrap: balance; }
+.necesidad-det:empty { display: none; }
+.tabla tr.sel td { background: var(--mustard); }
+.tabla tr.suma td { font-weight: 800; border-top: var(--stroke-md) solid var(--ink); }
