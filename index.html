@@ -27,6 +27,7 @@
       <button role="tab" data-vista="entregas" aria-selected="true">Entregas</button>
       <button role="tab" data-vista="contabilidad" aria-selected="false">Contabilidad</button>
       <button role="tab" data-vista="clientes" aria-selected="false">Clientes</button>
+      <button role="tab" data-vista="produccion" aria-selected="false">Producción</button>
     </nav>
   </header>
 
@@ -128,6 +129,41 @@
       </div>
       <div class="chips" id="cl-resumen"></div>
       <div class="tabla-caja"><table class="tabla tabla-clientes" id="cl-tabla"></table></div>
+    </section>
+
+    <!-- ===== 4. Inventario / producción ===== -->
+    <section class="vista" id="vista-produccion" hidden>
+      <div class="barra">
+        <button class="btn-mini" id="pr-ant" aria-label="Viernes anterior">◀</button>
+        <div class="barra-t">
+          <p class="eyebrow">Inventario y producción</p>
+          <h1 class="titulo" id="pr-titulo">Viernes</h1>
+        </div>
+        <button class="btn-mini" id="pr-sig" aria-label="Viernes siguiente">▶</button>
+      </div>
+      <div class="necesidades">
+        <article class="necesidad necesidad--destacada" aria-live="polite">
+          <p class="necesidad-frase" id="pr-frase-paq">Para la próxima entrega debemos tener</p>
+          <p class="necesidad-num cc-outline-md" id="pr-paquetes">0</p>
+          <p class="necesidad-unidad" id="pr-paquetes-u">paquetes de chorizos</p>
+          <p class="necesidad-det" id="pr-paquetes-det"></p>
+        </article>
+        <article class="necesidad" aria-live="polite">
+          <p class="necesidad-frase" id="pr-frase-lit">Para la próxima entrega debemos tener</p>
+          <p class="necesidad-num cc-outline-md" id="pr-litros">0</p>
+          <p class="necesidad-unidad" id="pr-litros-u">litros de guaro</p>
+          <p class="necesidad-det" id="pr-litros-det"></p>
+        </article>
+      </div>
+      <div class="chips" id="pr-avance"></div>
+      <p class="nota" id="pr-nota"></p>
+
+      <h2 class="seccion">Qué pidieron</h2>
+      <div class="tabla-caja"><table class="tabla" id="pr-desglose"></table></div>
+
+      <h2 class="seccion">Próximas entregas</h2>
+      <div class="tabla-caja"><table class="tabla tabla-clientes" id="pr-proximas"></table></div>
+      <p class="nota">Las cifras se actualizan solas cada vez que alguien crea, cambia o entrega un pedido. Cuentan todos los pedidos, pagados o no.</p>
     </section>
   </main>
 

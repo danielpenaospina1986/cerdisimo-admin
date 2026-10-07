@@ -1,10 +1,11 @@
 # Cerdísimo Chancho · Administración
 
-App web (un solo HTML, sin instalar nada) para Daniel y Mariana, con tres tableros:
+App web (un solo HTML, sin instalar nada) para Daniel y Mariana, con cuatro tableros:
 
 1. **Entregas**: pedidos del viernes, mapa con pines (verde = pagado, rojo = pendiente), botón **Crear pedido**, enlaces a Google Maps y Mapas de iPhone por cliente y ruta completa en Google Maps.
 2. **Contabilidad**: por mes, ventas cobradas, costo de producto, ganancia bruta, domicilios al fondo de gasolina, otros gastos y ganancia neta; reparto 50/50, liquidaciones totales o parciales, inversiones, tanqueadas e historial. Incluye el editor de precios y costos.
 3. **Clientes**: tabla editable (teléfono, dirección, pin), con cuántas veces y cada cuánto compra cada cliente.
+4. **Producción** (inventario): en tiempo real, cuántos paquetes de chorizos y cuántos litros de guaro hay que tener para la próxima entrega. Cuenta todos los pedidos de ese viernes, pagados o no; en la próxima entrega suma también los pedidos de viernes anteriores que no se han entregado. Muestra lo entregado y lo que falta, el detalle por producto y los próximos viernes.
 
 La primera vez que se abre con la base de datos vacía crea los 5 clientes del 6 de octubre de 2026 (1 paquete cada uno, entrega el viernes 9, pendientes de pago y sin dirección).
 
