@@ -71,9 +71,10 @@ function pintar() {
 
   $("#tabla-t").hidden = !cambios.length;
   $("#tabla").parentElement.hidden = !cambios.length;
-  $("#tabla").innerHTML = "<thead><tr><th>Entrega</th><th>Cliente</th><th>Producto</th><th class=num>Costo antes</th><th class=num>Costo nuevo</th><th class=num>Ganancia nueva</th></tr></thead><tbody>" +
-    cambios.map((c) => "<tr><td>" + fechaCorta(c.pedido.fechaEntrega) + "</td><td>" + esc(c.pedido.clienteNombre) + "</td><td>" + esc(c.pedido.resumen) +
-      '</td><td class="num">' + plata(c.costoAntes) + '</td><td class="num">' + plata(c.costo) + '</td><td class="num">' + plata(c.ganancia) + "</td></tr>").join("") + "</tbody>";
+  // En el celular se ven primero las columnas que importan; producto y fecha quedan a la derecha
+  $("#tabla").innerHTML = "<thead><tr><th>Cliente</th><th class=num>Costo antes</th><th class=num>Costo nuevo</th><th class=num>Ganancia nueva</th><th>Producto</th><th>Entrega</th></tr></thead><tbody>" +
+    cambios.map((c) => "<tr><td>" + esc(c.pedido.clienteNombre) + '</td><td class="num">' + plata(c.costoAntes) + '</td><td class="num">' + plata(c.costo) +
+      '</td><td class="num">' + plata(c.ganancia) + "</td><td>" + esc(c.pedido.resumen) + "</td><td>" + fechaCorta(c.pedido.fechaEntrega) + "</td></tr>").join("") + "</tbody>";
 
   const btn = $("#aplicar");
   btn.hidden = !cambios.length;
@@ -83,8 +84,10 @@ function pintar() {
   const hecho = $("#hecho");
   if (!cambios.length) {
     hecho.hidden = false;
-    hecho.textContent = (aplicados ? "Listo: se actualizaron " + aplicados + (aplicados === 1 ? " pedido" : " pedidos") + ". " : "") +
-      "Todos los pedidos ya usan " + plata(p.costoPaquete) + " por paquete. Puedes volver a la app.";
+    // En Firestore la vista local cambia antes de que el servidor confirme
+    hecho.textContent = aplicando ? "Guardando los cambios…"
+      : (aplicados ? "Listo: se actualizaron " + aplicados + (aplicados === 1 ? " pedido" : " pedidos") + ". " : "") +
+        "Todos los pedidos ya usan " + plata(p.costoPaquete) + " por paquete. Puedes volver a la app.";
   } else hecho.hidden = true;
 }
 
@@ -93,13 +96,17 @@ $("#aplicar").addEventListener("click", async () => {
   const cambios = calcularCambios(datos);
   if (!cambios.length) return;
   const p = precios(datos);
-  if (!confirm("¿Actualizar el costo de " + cambios.length + " pedidos a " + plata(p.costoPaquete) + " por paquete?")) return;
+  if (!(p.costoPaquete > 0) || !(p.costoLitro > 0)) {
+    $("#error").textContent = "El costo por paquete o por litro está en $0 en Precios y costos. Corrígelo en la app antes de actualizar.";
+    return;
+  }
+  if (!confirm("¿Actualizar el costo de " + cambios.length + (cambios.length === 1 ? " pedido" : " pedidos") + " a " + plata(p.costoPaquete) +
+    " por paquete y " + plata(p.costoLitro) + " por litro de aguardiente?")) return;
   aplicando = true; $("#error").textContent = ""; pintar();
   try {
-    // Firestore acepta hasta 500 escrituras por lote
-    for (let i = 0; i < cambios.length; i += 400) {
-      await store.lote(cambios.slice(i, i + 400).map((c) => ["actualizar", "pedidos", c.pedido.id, { costoProducto: c.costo, ganancia: c.ganancia }]));
-    }
+    // Uno por uno: cada escritura valida las reglas por separado (un lote grande puede pasar el
+    // límite de consultas de las reglas). Si alguno falla, al recargar quedan solo los pendientes.
+    await Promise.all(cambios.map((c) => store.actualizar("pedidos", c.pedido.id, { costoProducto: c.costo, ganancia: c.ganancia })));
     aplicados = cambios.length;
   } catch (e) {
     $("#error").textContent = "No se pudo actualizar: " + e.message + ". No se perdió nada; recarga la página e inténtalo otra vez.";
