@@ -131,7 +131,7 @@ function tarjetaPedido(p, n) {
   const estadoTxt = p.pagado ? "Pagado" : web ? ESTADOS[p.estado] || "Por pagar" : "Pendiente de pago";
   const pagoWeb = web
     ? '<p class="pago-web"><span class="tag app">App · ' + codigoPedido(p) + "</span> " +
-      (p.comprobante ? "Comprobante Nequi: <strong>" + esc(p.comprobante) + "</strong>" : p.pagado ? "" : "El cliente aún no reporta el pago.") +
+      (p.comprobante ? "Traslado a nombre de: <strong>" + esc(p.comprobante) + "</strong>" : p.pagado ? "" : "El cliente aún no reporta el pago.") +
       (p.estado === "rechazado" && p.notaPago ? " · Rechazado: " + esc(p.notaPago) : "") + "</p>"
     : "";
   const aviso = web && c.telefono ? avisoWhatsApp(p, c) : "";
@@ -300,7 +300,7 @@ document.addEventListener("click", async (e) => {
 async function aprobarPago(p) {
   const real = calcularPedido(p.items || {}, precios(datos), !!p.recoge);
   let msg = "¿Aprobar el pago de " + p.clienteNombre + " (" + codigoPedido(p) + ") por " + plata(p.total) + "?" +
-    (p.comprobante ? "\nComprobante Nequi: " + p.comprobante : "\nEl cliente no ha escrito comprobante.");
+    (p.comprobante ? "\nTraslado a nombre de: " + p.comprobante + "\nRevisa en Nequi que entró un traslado de ese nombre por ese valor." : "\nEl cliente aún no reporta el pago.");
   if (real.total !== p.total) msg += "\n\nOjo: con los precios de hoy este pedido vale " + plata(real.total) + ". Revisa cuánto llegó a Nequi.";
   if (!confirm(msg)) return;
   await store.actualizar("pedidos", p.id, { pagado: true, estado: "aprobado", aprobadoEn: new Date().toISOString(), aprobadoPor: correoSocio });
