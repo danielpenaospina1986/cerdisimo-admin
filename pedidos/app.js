@@ -1,6 +1,7 @@
 // App de pedidos para clientes de Cerdísimo Chancho.
 // Los pedidos caen en la misma base de datos que la app admin con estado "por_pagar";
-// el cliente reporta el comprobante de Nequi y Mariana aprueba el pago desde la app admin.
+// el cliente dice a nombre de quién salió el traslado y Mariana, al ver que coincide con lo que
+// entró a su Nequi, aprueba el pago desde la app admin.
 import { crearStore, modoPrueba } from "./datos.js";
 import {
   PRODUCTOS, precios, calcularPedido, hoyISO, fechaLarga, plata, enlaceWhatsApp,
@@ -209,7 +210,8 @@ function pintarPagar() {
   $("#pagar-nequi").innerHTML = cfg.nequi
     ? "También puedes enviarlo a Nequi al número <strong>" + esc(cfg.nequi) + "</strong>."
     : "";
-  $("#comprobante").value = p.comprobante || "";
+  // El campo "comprobante" guarda el nombre de quien hizo el traslado
+  $("#comprobante").value = p.comprobante || ficha.nombre || "";
   $("#pagar-error").textContent = p.estado === "rechazado" && p.notaPago ? "No encontramos tu pago: " + p.notaPago + ". Revisa y vuelve a enviarlo." : "";
   const wa = $("#pagar-whatsapp");
   if (cfg.whatsapp) {

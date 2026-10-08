@@ -100,9 +100,10 @@
         <p class="nota">En el mensaje del pago escribe el código <strong id="pagar-codigo-2"></strong> para que lo encontremos rápido.</p>
       </div>
       <form id="f-pagar" class="form">
-        <label class="etq">Número del comprobante de Nequi
-          <input class="campo" id="comprobante" inputmode="text" autocomplete="off" required placeholder="Aparece en el comprobante del pago">
+        <label class="etq">¿A nombre de quién sale el traslado?
+          <input class="campo" id="comprobante" autocomplete="name" required placeholder="Nombre de quien hizo el pago">
         </label>
+        <p class="nota">Con este nombre Mariana encuentra tu pago en Nequi. Si pagó otra persona, escribe su nombre.</p>
         <button class="btn btn-grande">Ya pagué</button>
         <p class="error" id="pagar-error"></p>
       </form>
