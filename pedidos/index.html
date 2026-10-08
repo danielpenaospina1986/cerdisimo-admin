@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Cerdísimo Chancho · Pedidos</title>
+  <meta name="description" content="Pide tus chorizos artesanales Cerdísimo Chancho para el viernes.">
+  <meta name="theme-color" content="#9a4526">
+  <link rel="icon" href="../assets/icono.png">
+  <link rel="apple-touch-icon" href="../assets/icono.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Luckiest+Guy&family=Shrikhand&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="pedidos.css">
+</head>
+<body>
+  <header class="cabecera">
+    <div class="cabecera-in">
+      <img class="logo" src="../assets/logo.png" alt="Cerdísimo Chancho">
+      <div class="marca">
+        <p class="marca-t cc-outline-sm">Cerdísimo</p>
+        <p class="marca-s">Pedidos</p>
+      </div>
+      <button class="btn-mini" id="salir" hidden>Salir</button>
+    </div>
+    <nav class="pestanas" role="tablist" id="pestanas" hidden>
+      <button role="tab" data-vista="pedir" aria-selected="true">Pedir</button>
+      <button role="tab" data-vista="mis" aria-selected="false">Mis pedidos</button>
+      <button role="tab" data-vista="datos" aria-selected="false">Mis datos</button>
+    </nav>
+  </header>
+
+  <p class="aviso" id="aviso-prueba" hidden>Modo prueba: los pedidos se guardan solo en este navegador.</p>
+
+  <main>
+    <div class="cargando" id="cargando">Cargando…</div>
+
+    <!-- ===== Entrar ===== -->
+    <section class="vista" id="vista-login" hidden>
+      <div class="hero">
+        <p class="eyebrow">Chorizos artesanales</p>
+        <h1 class="titulo">Pide para el viernes</h1>
+        <p>Entra una vez, guarda tu dirección y pide en un minuto. Pagas con Nequi y te llega el viernes.</p>
+      </div>
+      <div class="tarjeta form">
+        <button class="btn btn-grande" id="entrar-google">Entrar con Google</button>
+        <p class="o">o con tu correo, sin contraseña</p>
+        <form id="f-enlace" class="form">
+          <label class="etq">Correo electrónico
+            <input class="campo" id="correo" type="email" autocomplete="email" required placeholder="tucorreo@hotmail.com">
+          </label>
+          <button class="btn btn-sec">Enviarme un enlace para entrar</button>
+        </form>
+        <p class="nota fuerte" id="enlace-estado"></p>
+        <p class="error" id="login-error"></p>
+      </div>
+    </section>
+
+    <!-- ===== Pedir ===== -->
+    <section class="vista" id="vista-pedir" hidden>
+      <div class="barra">
+        <div class="barra-t">
+          <p class="eyebrow" id="saludo">Hola</p>
+          <h1 class="titulo">¿Qué te llevamos?</h1>
+        </div>
+      </div>
+      <p class="entrega-info" id="entrega-info"></p>
+      <form id="f-pedir" class="form">
+        <fieldset class="productos" id="productos"></fieldset>
+        <fieldset class="opciones">
+          <legend class="etq">¿Cómo lo recibes?</legend>
+          <label class="check"><input type="radio" name="recibe" value="domi" checked> Domicilio a mi dirección</label>
+          <label class="check"><input type="radio" name="recibe" value="recoge"> Lo recojo</label>
+        </fieldset>
+        <p class="nota" id="dir-pedido"></p>
+        <label class="etq">Notas para este pedido <input class="campo" id="pedir-notas" placeholder="Opcional: hora, portería, etc."></label>
+        <div class="total" id="total"></div>
+        <p class="error" id="pedir-error"></p>
+        <button class="btn btn-grande" id="pedir-btn">Hacer pedido</button>
+      </form>
+    </section>
+
+    <!-- ===== Pagar ===== -->
+    <section class="vista" id="vista-pagar" hidden>
+      <div class="barra">
+        <button class="btn-mini" id="pagar-volver" aria-label="Volver a mis pedidos">◀</button>
+        <div class="barra-t">
+          <p class="eyebrow" id="pagar-codigo">Pedido</p>
+          <h1 class="titulo">Paga con Nequi</h1>
+        </div>
+      </div>
+      <div class="tarjeta pago-caja">
+        <p class="pago-valor">Valor exacto<br><strong id="pagar-total">$0</strong></p>
+        <img class="qr" id="qr" alt="Código QR de Nequi de Cerdísimo Chancho" hidden>
+        <p class="qr-falta" id="qr-falta" hidden>Aquí va el código QR de Nequi.</p>
+        <p id="pagar-nequi"></p>
+        <p class="nota">En el mensaje del pago escribe el código <strong id="pagar-codigo-2"></strong> para que lo encontremos rápido.</p>
+      </div>
+      <form id="f-pagar" class="form">
+        <label class="etq">Número del comprobante de Nequi
+          <input class="campo" id="comprobante" inputmode="text" autocomplete="off" required placeholder="Aparece en el comprobante del pago">
+        </label>
+        <button class="btn btn-grande">Ya pagué</button>
+        <p class="error" id="pagar-error"></p>
+      </form>
+      <a class="btn btn-sec" id="pagar-whatsapp" target="_blank" rel="noopener" hidden>Enviar la captura por WhatsApp</a>
+      <p class="nota" id="pagar-corte"></p>
+    </section>
+
+    <!-- ===== Mis pedidos ===== -->
+    <section class="vista" id="vista-mis" hidden>
+      <div class="barra">
+        <div class="barra-t">
+          <p class="eyebrow">Historial</p>
+          <h1 class="titulo">Mis pedidos</h1>
+        </div>
+      </div>
+      <div class="lista" id="mis-lista"></div>
+    </section>
+
+    <!-- ===== Mis datos ===== -->
+    <section class="vista" id="vista-datos" hidden>
+      <div class="barra">
+        <div class="barra-t">
+          <p class="eyebrow">Para tus entregas</p>
+          <h1 class="titulo">Mis datos</h1>
+        </div>
+      </div>
+      <p class="aviso aviso-dentro" id="datos-primera" hidden>Antes de tu primer pedido, cuéntanos quién eres y a dónde te lo llevamos.</p>
+      <form id="f-datos" class="form">
+        <label class="etq">Nombre y apellido <input class="campo" id="d-nombre" autocomplete="name" required></label>
+        <label class="etq">Celular con WhatsApp <input class="campo" id="d-tel" type="tel" inputmode="tel" autocomplete="tel" required placeholder="300 123 4567"></label>
+        <label class="etq">Dirección <input class="campo" id="d-dir" autocomplete="street-address" placeholder="Calle 10 # 43-20, apto 501, El Poblado"></label>
+        <label class="etq">Indicaciones <input class="campo" id="d-notas" placeholder="Portería, torre, punto de referencia"></label>
+        <div class="fila-btn">
+          <button type="button" class="btn btn-sec btn-chico" id="d-buscar">Ubicar en el mapa</button>
+          <span class="nota" id="d-estado"></span>
+        </div>
+        <div id="d-mapa" class="mapa mapa-chico"></div>
+        <p class="nota">Si el pin no quedó en tu casa, arrástralo o toca el mapa en el punto exacto.</p>
+        <label class="check autoriza"><input type="checkbox" id="d-autoriza" required> Autorizo el tratamiento de mis datos personales</label>
+        <details class="politica">
+          <summary>Qué hacemos con tus datos</summary>
+          <p>Cerdísimo Chancho (Daniel y Mariana) guarda tu nombre, celular, correo y dirección solo para tomar tus pedidos, entregarlos y avisarte de su estado, según la Ley 1581 de 2012. No los compartimos con nadie. Puedes pedir que los corrijamos o los borremos escribiéndonos por WhatsApp.</p>
+        </details>
+        <p class="error" id="datos-error"></p>
+        <button class="btn btn-grande" id="datos-btn">Guardar mis datos</button>
+        <p class="nota" id="datos-correo"></p>
+      </form>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

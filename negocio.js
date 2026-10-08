@@ -132,10 +132,10 @@ export function saldos(datos) {
 // Enlaces de mapas para un punto
 export function enlaceGoogle(c) { return "https://www.google.com/maps/search/?api=1&query=" + c.lat + "," + c.lng; }
 export function enlaceApple(c) { return "https://maps.apple.com/?ll=" + c.lat + "," + c.lng + "&q=" + encodeURIComponent(c.nombre || "Entrega"); }
-export function enlaceWhatsApp(tel) {
+export function enlaceWhatsApp(tel, texto) {
   let d = String(tel || "").replace(/\D/g, "");
   if (d.length === 10) d = "57" + d;
-  return "https://wa.me/" + d;
+  return "https://wa.me/" + d + (texto ? "?text=" + encodeURIComponent(texto) : "");
 }
 
 // Ordena las paradas por cercanía (vecino más cercano) desde el primer punto o un origen.
@@ -236,3 +236,39 @@ export function necesidadesEntrega(pedidos, viernes, conAtrasados) {
 export function viernesConPedidos(pedidos, desde) {
   return [...new Set(pedidos.map((p) => p.fechaEntrega).filter((f) => f && f >= desde))].sort();
 }
+
+// ---------- Pedidos de la app de clientes ----------
+// Los pedidos que hacen los clientes en /pedidos llevan origen "web" y un estado:
+//   por_pagar → (el cliente reporta el comprobante) → por_verificar → (Mariana) aprobado | rechazado
+//   cancelado: lo canceló el cliente, o seguía sin pagar al corte.
+// Los pedidos creados a mano en la app admin no llevan estado y funcionan como siempre.
+export const ESTADOS = {
+  por_pagar: "Por pagar",
+  por_verificar: "Por verificar pago",
+  aprobado: "Pago aprobado",
+  rechazado: "Pago rechazado",
+  cancelado: "Cancelado"
+};
+
+// Corte: jueves a las 12:00 m. Lo pedido antes del corte sale el viernes de esa semana.
+export const CORTE = { dia: 4, hora: 12, texto: "jueves a las 12 m." };
+
+// Viernes de entrega de un pedido hecho ahora en la app de clientes.
+export function viernesParaPedidoWeb(ahora = new Date()) {
+  const v = viernesDeEntrega(aISO(ahora));
+  return ahora.getDay() === CORTE.dia && ahora.getHours() >= CORTE.hora ? sumarDias(v, 7) : v;
+}
+// Fecha y hora del corte de un viernes (el jueves anterior a las 12:00, hora del celular).
+export function corteDe(viernes) {
+  const d = deISO(sumarDias(viernes, -1));
+  d.setHours(CORTE.hora, 0, 0, 0);
+  return d;
+}
+export const pasoElCorte = (viernes, ahora = new Date()) => ahora >= corteDe(viernes);
+
+// Un pedido de la app que sigue sin pagar cuando pasa el corte se cancela solo.
+export const venceAlCorte = (p, ahora = new Date()) =>
+  p.origen === "web" && (p.estado === "por_pagar" || p.estado === "rechazado") && pasoElCorte(p.fechaEntrega, ahora);
+
+// Código corto para identificar el pago en Nequi y en WhatsApp (CC- + 5 caracteres del ID).
+export const codigoPedido = (p) => "CC-" + String(p.id || "").replace(/[^a-z0-9]/gi, "").slice(0, 5).toUpperCase();

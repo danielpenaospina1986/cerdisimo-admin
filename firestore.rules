@@ -1,13 +1,31 @@
 rules_version = '2';
 
-// Solo entran las cuentas de Google que estén en la colección "socios"
+// Socios (Daniel y Mariana): las cuentas de Google que estén en la colección "socios"
 // (un documento por socio cuyo ID es su correo, por ejemplo socios/nombre@gmail.com).
+// Pueden leer y escribir todo.
+//
+// Clientes de la app de pedidos (/pedidos): cualquier persona que entre con Google o con el
+// enlace al correo. Solo ve y edita su propia ficha (clientes/{su uid}) y sus propios pedidos,
+// lee los precios, y nunca puede marcar un pedido como pagado ni entregado.
 service cloud.firestore {
   match /databases/{database}/documents {
     function esSocio() {
       return request.auth != null
         && request.auth.token.email_verified == true
         && exists(/databases/$(database)/documents/socios/$(request.auth.token.email));
+    }
+    function esCliente(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    function fichaValida() {
+      let f = request.resource.data;
+      return f.keys().hasOnly(['nombre', 'telefono', 'direccion', 'notas', 'lat', 'lng', 'email',
+                               'origen', 'creado', 'autorizaDatos', 'autorizaDatosEn'])
+        && f.origen == 'web'
+        && f.autorizaDatos == true
+        && f.nombre is string && f.nombre.size() > 0 && f.nombre.size() <= 80
+        && f.telefono is string && f.telefono.size() <= 30
+        && f.direccion is string && f.direccion.size() <= 200;
     }
 
     // Cada quien puede comprobar si está autorizado; nadie edita la lista desde la app.
@@ -16,9 +34,39 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    match /clientes/{id}    { allow read, write: if esSocio(); }
-    match /pedidos/{id}     { allow read, write: if esSocio(); }
+    match /clientes/{id} {
+      allow read, write: if esSocio();
+      allow read: if esCliente(id);
+      allow create, update: if esCliente(id) && fichaValida();
+    }
+
+    match /pedidos/{id} {
+      allow read, write: if esSocio();
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      // Un pedido nuevo de la app entra siempre sin pagar, sin entregar y por pagar
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.clienteId == request.auth.uid
+        && request.resource.data.origen == 'web'
+        && request.resource.data.estado == 'por_pagar'
+        && request.resource.data.pagado == false
+        && request.resource.data.entregado == false
+        && !('ruta' in request.resource.data)
+        && exists(/databases/$(database)/documents/clientes/$(request.auth.uid));
+      // Mientras no esté aprobado, el cliente solo puede reportar el pago o cancelarlo
+      allow update: if request.auth != null
+        && resource.data.uid == request.auth.uid
+        && resource.data.estado in ['por_pagar', 'por_verificar', 'rechazado']
+        && request.resource.data.estado in ['por_verificar', 'cancelado']
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['estado', 'comprobante', 'reportadoEn', 'canceladoEn', 'canceladoPor']);
+    }
+
     match /movimientos/{id} { allow read, write: if esSocio(); }
-    match /config/{id}      { allow read, write: if esSocio(); }
+
+    match /config/{id} {
+      allow read, write: if esSocio();
+      allow read: if request.auth != null && id == 'precios';
+    }
   }
 }
