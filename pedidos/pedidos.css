@@ -1,0 +1,28 @@
+/* App de pedidos para clientes: usa los tokens y componentes de ../styles.css */
+main { max-width: 620px; }
+.hero { text-align: center; margin: 18px 0 16px; }
+.hero .titulo { margin-bottom: 8px; }
+.hero p:last-child { margin: 0 auto; max-width: 420px; }
+.o { text-align: center; margin: 4px 0; font-family: var(--font-script); color: var(--rust-deep); }
+
+.entrega-info { background: var(--paper); border: var(--stroke-md) solid var(--ink); border-radius: var(--radius-md); padding: 10px 14px; margin: 0 0 14px; box-shadow: var(--shadow-sm); }
+.opciones { border: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.opciones legend { margin-bottom: 6px; }
+
+.pago-caja { text-align: center; }
+.pago-valor { margin: 0 0 10px; }
+.pago-valor strong { font: 400 40px/1.1 var(--font-display); color: var(--rust); letter-spacing: .02em; }
+.qr { display: block; width: min(260px, 70vw); height: auto; margin: 0 auto 10px; border: var(--stroke-md) solid var(--ink); border-radius: var(--radius-md); background: #fff; }
+.qr-falta { width: min(260px, 70vw); aspect-ratio: 1; margin: 0 auto 10px; display: grid; place-items: center; padding: 16px; border: var(--stroke-md) dashed var(--ink); border-radius: var(--radius-md); background: var(--paper); }
+#vista-pagar > .btn { display: block; text-align: center; margin-top: 12px; }
+
+.pedido-codigo { font-family: var(--font-display); font-size: 15px; letter-spacing: .04em; }
+.estado.amarillo { background: var(--mustard); color: var(--ink); }
+.estado.gris { background: var(--cream-ray); color: var(--ink); }
+.pedido.cancelado { opacity: .6; }
+.vacio { text-align: center; padding: 24px 12px; }
+
+.aviso-dentro { margin: 0 0 14px; }
+.autoriza { margin-top: 4px; }
+.politica { font-size: 14px; }
+.politica summary { cursor: pointer; font-weight: 800; color: var(--rust-deep); }

@@ -3,14 +3,14 @@ import {
   PRODUCTOS, PRECIOS_BASE, SOCIOS, precios, calcularPedido, hoyISO, sumarDias, viernesDeEntrega, viernesActual,
   fechaLarga, fechaCorta, nombreMes, plata, leerPlata, resumenMes, saldos,
   enlaceGoogle, enlaceApple, enlaceWhatsApp, ordenarDesdeElNorte, ordenDeReparto, enlaceRutaGoogle,
-  necesidadesEntrega, viernesConPedidos
+  necesidadesEntrega, viernesConPedidos, ESTADOS, venceAlCorte, codigoPedido
 } from "./negocio.js";
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
-let store;
+let store, correoSocio = "";
 let datos = { clientes: [], pedidos: [], movimientos: [], config: [] };
 const ui = { vista: "entregas", viernes: viernesActual(), viernesProd: null, mes: hoyISO().slice(0, 7) };
 
@@ -21,9 +21,12 @@ async function iniciar() {
     store = await crearStore();
     const sesion = await store.iniciar(pedirLogin);
     if (!modoPrueba) { $("#salir").hidden = false; $("#salir").onclick = () => store.salir(); }
+    correoSocio = (sesion.usuario && sesion.usuario.email) || "";
     let sembrado = false;
     store.escuchar(async (d) => {
-      datos = d;
+      // Los pedidos cancelados (por el cliente o por el corte) no cuentan en ninguna pestaña
+      cancelarVencidos(d.pedidos);
+      datos = { ...d, pedidos: d.pedidos.filter((p) => p.estado !== "cancelado" && !venceAlCorte(p)) };
       if (!sembrado) {
         sembrado = true;
         try { if (await sembrarSiHaceFalta(store, d)) return; } catch (e) { console.error(e); }
@@ -37,6 +40,20 @@ async function iniciar() {
     console.error(e);
   }
 }
+
+// Pedidos de la app que siguen sin pagar al corte del jueves: se cancelan solos.
+const cancelando = new Set();
+function cancelarVencidos(pedidos) {
+  const vencidos = pedidos.filter((p) => venceAlCorte(p) && !cancelando.has(p.id));
+  if (!vencidos.length) return;
+  vencidos.forEach((p) => cancelando.add(p.id));
+  store.lote(vencidos.map((p) => ["actualizar", "pedidos", p.id, { estado: "cancelado", canceladoPor: "corte", canceladoEn: new Date().toISOString() }]))
+    .catch((e) => { console.warn(e); vencidos.forEach((p) => cancelando.delete(p.id)); });
+}
+
+const esWeb = (p) => p && p.origen === "web";
+// Lo que se produce: los pedidos creados aquí (pagados o no) y los de la app con pago aprobado
+const confirmado = (p) => !esWeb(p) || !!p.pagado;
 
 function pedirLogin(entrar) {
   const d = $("#d-login");
@@ -110,22 +127,46 @@ function tarjetaPedido(p, n) {
   const tel = c.telefono
     ? '<a class="enlace" href="tel:' + esc(c.telefono.replace(/\s/g, "")) + '">' + esc(c.telefono) + '</a> · <a class="enlace" target="_blank" rel="noopener" href="' + enlaceWhatsApp(c.telefono) + '">WhatsApp</a>'
     : '<span class="sin-dir">Sin teléfono</span>';
+  const web = esWeb(p);
+  const estadoTxt = p.pagado ? "Pagado" : web ? ESTADOS[p.estado] || "Por pagar" : "Pendiente de pago";
+  const pagoWeb = web
+    ? '<p class="pago-web"><span class="tag app">App · ' + codigoPedido(p) + "</span> " +
+      (p.comprobante ? "Comprobante Nequi: <strong>" + esc(p.comprobante) + "</strong>" : p.pagado ? "" : "El cliente aún no reporta el pago.") +
+      (p.estado === "rechazado" && p.notaPago ? " · Rechazado: " + esc(p.notaPago) : "") + "</p>"
+    : "";
+  const aviso = web && c.telefono ? avisoWhatsApp(p, c) : "";
+  const botonPago = web && !p.pagado
+    ? '<button class="btn btn-chico" data-acc="aprobar" data-id="' + p.id + '">Aprobar pago</button>' +
+      (p.estado === "por_verificar" ? '<button class="btn btn-sec btn-chico" data-acc="rechazar" data-id="' + p.id + '">Rechazar</button>' : "")
+    : '<button class="btn btn-chico" data-acc="pagado" data-id="' + p.id + '">' + (p.pagado ? "Marcar sin pagar" : "Marcar pagado") + "</button>";
   return '<article class="pedido ' + (p.pagado ? "pagado" : "pendiente") + (p.entregado ? " entregado" : "") + '">' +
     '<div class="pedido-cab">' + (n ? '<span class="pedido-num">' + n + "</span>" : "") +
     '<p class="pedido-nombre">' + esc(nombre) + "</p>" +
-    '<span class="estado ' + color + '">' + (p.pagado ? "Pagado" : "Pendiente de pago") + "</span>" +
+    '<span class="estado ' + color + '">' + estadoTxt + "</span>" +
     '<span class="pedido-total">' + plata(p.total) + "</span></div>" +
     "<p>" + esc(p.resumen) + (p.domi ? " + domi " + plata(p.domi) : p.recoge ? " · lo recoge" : " · domi gratis") +
     (p.entregado ? " · <strong>Entregado</strong>" : "") + "</p>" +
+    pagoWeb +
     "<p>" + dir + "</p><p>" + tel + "</p>" +
     (p.notas ? "<p><em>" + esc(p.notas) + "</em></p>" : "") +
     '<div class="pedido-acc">' +
-    '<button class="btn btn-chico" data-acc="pagado" data-id="' + p.id + '">' + (p.pagado ? "Marcar sin pagar" : "Marcar pagado") + "</button>" +
+    botonPago + aviso +
     '<button class="btn btn-sec btn-chico" data-acc="entregado" data-id="' + p.id + '">' + (p.entregado ? "No entregado" : "Entregado") + "</button>" +
     mapas +
     '<button class="btn btn-sec btn-chico" data-acc="editar" data-id="' + p.id + '">Editar</button>' +
     (c.id ? '<button class="btn btn-sec btn-chico" data-acc="cliente" data-id="' + c.id + '">' + (c.direccion ? "Datos del cliente" : "Agregar dirección") + "</button>" : "") +
     "</div></article>";
+}
+
+// Mensaje listo para avisarle al cliente por WhatsApp según el estado de su pedido
+function avisoWhatsApp(p, c) {
+  const nombre = (c.nombre || p.clienteNombre || "").split(" ")[0];
+  const texto = p.pagado
+    ? "Hola " + nombre + ", tu pago del pedido " + codigoPedido(p) + " fue aprobado. Te llega el " + fechaLarga(p.fechaEntrega) + ". ¡Gracias por pedirle a Cerdísimo Chancho!"
+    : p.estado === "rechazado"
+      ? "Hola " + nombre + ", no encontramos el pago del pedido " + codigoPedido(p) + " por " + plata(p.total) + ". ¿Nos mandas la captura del comprobante de Nequi?"
+      : "Hola " + nombre + ", recibimos tu pedido " + codigoPedido(p) + " por " + plata(p.total) + ". Apenas nos llegue el pago a Nequi lo aprobamos.";
+  return '<a class="btn btn-sec btn-chico" target="_blank" rel="noopener" href="' + enlaceWhatsApp(c.telefono, texto) + '">Avisar por WhatsApp</a>';
 }
 
 function pintarEntregas() {
@@ -138,7 +179,9 @@ function pintarEntregas() {
   const litros = delDia.reduce((t, p) => t + (p.litros || 0), 0);
   const cobrado = delDia.filter((p) => p.pagado).reduce((t, p) => t + p.total, 0);
   const porCobrar = delDia.filter((p) => !p.pagado).reduce((t, p) => t + p.total, 0);
+  const porVerificar = delDia.filter((p) => esWeb(p) && p.estado === "por_verificar").length;
   $("#v-resumen").innerHTML =
+    (porVerificar ? '<span class="chip app">' + porVerificar + " por verificar pago</span>" : "") +
     '<span class="chip rust">' + delDia.length + " pedidos</span>" +
     '<span class="chip">' + paquetes + " paquetes</span>" +
     (litros ? '<span class="chip">' + litros + " L de aguardiente</span>" : "") +
@@ -235,13 +278,33 @@ document.addEventListener("click", async (e) => {
   if (!b) return;
   const id = b.dataset.id;
   const p = datos.pedidos.find((x) => x.id === id);
-  if (b.dataset.acc === "pagado" && p) await store.actualizar("pedidos", id, { pagado: !p.pagado });
+  if (b.dataset.acc === "pagado" && p) {
+    await store.actualizar("pedidos", id, esWeb(p)
+      ? { pagado: !p.pagado, estado: p.pagado ? "por_verificar" : "aprobado" }
+      : { pagado: !p.pagado });
+  }
+  if (b.dataset.acc === "aprobar" && p) await aprobarPago(p);
+  if (b.dataset.acc === "rechazar" && p) {
+    const nota = prompt("¿Por qué se rechaza? El cliente lo ve en su app.", "No vemos el pago en Nequi");
+    if (nota !== null) await store.actualizar("pedidos", id, { estado: "rechazado", notaPago: nota.trim(), rechazadoEn: new Date().toISOString() });
+  }
   if (b.dataset.acc === "entregado" && p) await store.actualizar("pedidos", id, { entregado: !p.entregado });
   if (b.dataset.acc === "editar" && p) abrirPedido(p);
   if (b.dataset.acc === "cliente") abrirCliente(cliente(id));
   if (b.dataset.acc === "borrar-mov" && confirm("¿Borrar este movimiento?")) await store.borrar("movimientos", id);
   if (b.dataset.acc === "borrar-pedido" && p && confirm("¿Borrar el pedido de " + p.clienteNombre + "?")) await store.borrar("pedidos", id);
 });
+
+// Aprobar el pago de un pedido de la app. Recalcula el total con los precios vigentes por si el
+// pedido llegó con un valor distinto (precios cambiados o un pedido manipulado).
+async function aprobarPago(p) {
+  const real = calcularPedido(p.items || {}, precios(datos), !!p.recoge);
+  let msg = "¿Aprobar el pago de " + p.clienteNombre + " (" + codigoPedido(p) + ") por " + plata(p.total) + "?" +
+    (p.comprobante ? "\nComprobante Nequi: " + p.comprobante : "\nEl cliente no ha escrito comprobante.");
+  if (real.total !== p.total) msg += "\n\nOjo: con los precios de hoy este pedido vale " + plata(real.total) + ". Revisa cuánto llegó a Nequi.";
+  if (!confirm(msg)) return;
+  await store.actualizar("pedidos", p.id, { pagado: true, estado: "aprobado", aprobadoEn: new Date().toISOString(), aprobadoPor: correoSocio });
+}
 
 // ---------- Crear / editar pedido ----------
 let pedidoEditando = null;
@@ -354,6 +417,7 @@ $("#f-pedido").addEventListener("submit", async (e) => {
       // Si no cambió lo pedido, se conservan los precios con que se creó
       const igual = PRODUCTOS.every((x) => Number((pedidoEditando.items || {})[x.id] || 0) === Number(items[x.id] || 0)) && !!pedidoEditando.recoge === recoge;
       if (igual) Object.keys(calc).forEach((k) => delete base[k]);
+      if (esWeb(pedidoEditando) && base.pagado !== !!pedidoEditando.pagado) base.estado = base.pagado ? "aprobado" : "por_verificar";
       await store.actualizar("pedidos", pedidoEditando.id, base);
     } else {
       let c = buscarCliente(nombre);
@@ -659,7 +723,9 @@ function pintarPrecios() {
   const p = precios(datos);
   $("#f-precios").innerHTML = '<div class="fila2">' + CAMPOS_PRECIO.map(([k, n]) =>
     '<label class="etq">' + n + ' <input class="campo" inputmode="numeric" name="' + k + '" value="' + plata(p[k]) + '"></label>').join("") +
-    '<label class="etq">Ciudad para ubicar direcciones <input class="campo" name="ciudad" value="' + esc(ciudad()) + '"></label></div>' +
+    '<label class="etq">Ciudad para ubicar direcciones <input class="campo" name="ciudad" value="' + esc(ciudad()) + '"></label>' +
+    '<label class="etq">Nequi para pagos (lo ven los clientes) <input class="campo" name="nequi" inputmode="tel" value="' + esc(p.nequi || "") + '" placeholder="300 123 4567"></label>' +
+    '<label class="etq">WhatsApp del negocio (lo ven los clientes) <input class="campo" name="whatsapp" inputmode="tel" value="' + esc(p.whatsapp || "") + '" placeholder="300 123 4567"></label></div>' +
     '<p class="nota">Los pedidos ya creados conservan los precios con que se guardaron.</p>' +
     '<div class="botonera"><button type="button" class="btn btn-sec btn-chico" id="pr-base">Volver a los de octubre 2026</button><button class="btn btn-chico">Guardar precios</button></div>';
   $("#pr-base").onclick = async () => { await store.fijar("config", "precios", { ...PRECIOS_BASE, ciudad: ciudad() }); preciosPintados = false; pintarPrecios(); };
@@ -670,6 +736,8 @@ $("#f-precios").addEventListener("submit", async (e) => {
   const doc = {};
   CAMPOS_PRECIO.forEach(([k]) => { doc[k] = leerPlata(f.get(k)); });
   doc.ciudad = String(f.get("ciudad") || "Medellín").trim();
+  doc.nequi = String(f.get("nequi") || "").trim();
+  doc.whatsapp = String(f.get("whatsapp") || "").trim();
   await store.fijar("config", "precios", doc);
   alert("Precios guardados.");
 });
@@ -699,7 +767,8 @@ function pintarProduccion() {
   const proxima = viernesActual();
   const v = ui.viernesProd || proxima;
   const esProxima = v === proxima;
-  const n = necesidadesEntrega(datos.pedidos, v, esProxima);
+  const n = necesidadesEntrega(datos.pedidos.filter(confirmado), v, esProxima);
+  const espera = necesidadesEntrega(datos.pedidos.filter((p) => !confirmado(p)), v, esProxima);
   $("#pr-titulo").textContent = fechaLarga(v);
 
   const frase = esProxima ? "Para la próxima entrega debemos tener"
@@ -726,6 +795,10 @@ function pintarProduccion() {
     avance.push('<span class="chip rojo">Por entregar: ' + n.porEntregar.paquetes + " paq. · " + n.porEntregar.litros + " L</span>");
     avance.push('<span class="chip verde">Entregado: ' + n.entregados.paquetes + " paq. · " + n.entregados.litros + " L</span>");
   }
+  if (espera.pedidos.length) {
+    avance.push('<span class="chip app">Esperando pago en la app: ' + espera.pedidos.length + " " + plural(espera.pedidos.length, "pedido", "pedidos") +
+      " · " + espera.paquetes + " paq. · " + espera.litros + " L</span>");
+  }
   $("#pr-avance").innerHTML = avance.join("");
   $("#pr-nota").textContent = n.atrasados
     ? "Incluye " + n.atrasados + " " + plural(n.atrasados, "pedido", "pedidos") + " de viernes anteriores que no se ha" + (n.atrasados === 1 ? "" : "n") +
@@ -739,11 +812,11 @@ function pintarProduccion() {
         '<tr class="suma"><td>Total</td><td></td><td class="num">' + n.paquetes + '</td><td class="num">' + n.litros + "</td></tr>"
       : '<tr class="vacia"><td colspan="4">Sin pedidos para este viernes.</td></tr>') + "</tbody>";
 
-  const viernes = viernesConPedidos(datos.pedidos, proxima);
+  const viernes = viernesConPedidos(datos.pedidos.filter(confirmado), proxima);
   if (!viernes.includes(proxima)) viernes.unshift(proxima);
   $("#pr-proximas").innerHTML = "<thead><tr><th>Viernes</th><th class=num>Pedidos</th><th class=num>Paquetes</th><th class=num>Litros</th></tr></thead><tbody>" +
     viernes.map((f) => {
-      const x = necesidadesEntrega(datos.pedidos, f, f === proxima);
+      const x = necesidadesEntrega(datos.pedidos.filter(confirmado), f, f === proxima);
       return '<tr tabindex="0" data-viernes="' + f + '"' + (f === v ? ' class="sel" aria-current="true"' : "") + "><td>" + fechaCorta(f) + (f === proxima ? " <span class=\"tag verde\">próxima</span>" : "") +
         '</td><td class="num">' + x.pedidos.length + '</td><td class="num">' + x.paquetes + '</td><td class="num">' + x.litros + "</td></tr>";
     }).join("") + "</tbody>";

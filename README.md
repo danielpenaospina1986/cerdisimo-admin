@@ -9,6 +9,18 @@ App web (un solo HTML, sin instalar nada) para Daniel y Mariana, con cuatro tabl
 
 La primera vez que se abre con la base de datos vacía crea los 5 clientes del 6 de octubre de 2026 (1 paquete cada uno, entrega el viernes 9, pendientes de pago y sin dirección).
 
+## App de pedidos para clientes (`/pedidos`)
+
+Maqueta funcional de la fase 1: los clientes entran en `…/cerdisimo-admin/pedidos/`, con su cuenta de Google o con un enlace a su correo (sin contraseña), guardan sus datos una vez y piden para el viernes. Usa la misma base de datos que la app admin.
+
+- **Corte**: jueves a las 12 m. Lo pedido antes sale ese viernes; después, el siguiente.
+- **Pago**: el cliente paga al QR de Nequi (archivo `assets/nequi-qr.png`) o al número de Nequi que se configura en Contabilidad → Precios y costos, y escribe el número de comprobante.
+- **Estados**: *Por pagar* → *Por verificar pago* (el cliente reportó el comprobante) → *Pago aprobado* o *Pago rechazado* (lo decide Mariana en Entregas). Un pedido de la app que sigue *Por pagar* o *Rechazado* al corte se cancela solo. Quien quiera pagar contra entrega pide por WhatsApp y se crea a mano, como siempre.
+- **En la app admin**: los pedidos de la app llevan la marca «App · CC-XXXXX». Entregas tiene *Aprobar pago*, *Rechazar* y *Avisar por WhatsApp* con el mensaje listo. Producción cuenta los pedidos creados a mano (pagados o no) y los de la app con pago aprobado; los que esperan pago aparecen aparte. Contabilidad solo cuenta pagados, como antes. Los cancelados no aparecen en ninguna pestaña.
+- **Seguridad** (`firestore.rules`): cada cliente solo ve y edita su ficha y sus pedidos, lee los precios y nunca puede marcar un pedido como pagado o entregado. Al aprobar, la app admin recalcula el total y avisa si no cuadra con los precios vigentes.
+
+Para activarla en Firebase: pegar las reglas nuevas y activar el inicio de sesión con enlace al correo (**Authentication → Método de acceso → Correo electrónico/contraseña → Vínculo de correo electrónico**).
+
 ## Reglas de negocio (de la calculadora "Ganancias por pedido")
 
 | Producto | Precio |
@@ -52,4 +64,4 @@ Si `firebase-config.js` está vacío, la app funciona igual pero guarda los dato
 - Las direcciones colombianas con "#" no siempre se encuentran exactas: en Clientes se puede arrastrar el pin o tocar el mapa en el punto correcto.
 
 ## Archivos
-`index.html`, `styles.css` (tokens del sistema de diseño), `app.js` (pantallas), `negocio.js` (precios y cuentas), `store.js` (Firestore o modo prueba), `semilla.js` (5 clientes iniciales), `firebase-config.js`, `firestore.rules`.
+`index.html`, `styles.css` (tokens del sistema de diseño), `app.js` (pantallas), `negocio.js` (precios, cuentas y corte), `store.js` (Firestore o modo prueba), `semilla.js` (5 clientes iniciales), `firebase-config.js`, `firestore.rules`. App de clientes: `pedidos/index.html`, `pedidos/app.js`, `pedidos/datos.js`, `pedidos/pedidos.css`.
