@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Cerdísimo Admin</title>
+  <title>Cerdísimo Chancho · Pedidos</title>
+  <meta name="description" content="Pide tus chorizos artesanales Cerdísimo Chancho para el viernes.">
   <meta name="theme-color" content="#9a4526">
   <link rel="icon" href="assets/icono.png">
   <link rel="apple-touch-icon" href="assets/icono.png">
@@ -12,6 +13,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Luckiest+Guy&family=Shrikhand&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="pedidos/pedidos.css">
 </head>
 <body>
   <header class="cabecera">
@@ -19,246 +21,140 @@
       <img class="logo" src="assets/logo.png" alt="Cerdísimo Chancho">
       <div class="marca">
         <p class="marca-t cc-outline-sm">Cerdísimo</p>
-        <p class="marca-s">Administración</p>
+        <p class="marca-s">Pedidos</p>
       </div>
       <button class="btn-mini" id="salir" hidden>Salir</button>
     </div>
-    <nav class="pestanas" role="tablist">
-      <button role="tab" data-vista="entregas" aria-selected="true">Entregas</button>
-      <button role="tab" data-vista="contabilidad" aria-selected="false">Contabilidad</button>
-      <button role="tab" data-vista="clientes" aria-selected="false">Clientes</button>
-      <button role="tab" data-vista="produccion" aria-selected="false">Producción</button>
+    <nav class="pestanas" role="tablist" id="pestanas" hidden>
+      <button role="tab" data-vista="pedir" aria-selected="true">Pedir</button>
+      <button role="tab" data-vista="mis" aria-selected="false">Mis pedidos</button>
+      <button role="tab" data-vista="datos" aria-selected="false">Mis datos</button>
     </nav>
   </header>
 
-  <p class="aviso" id="aviso-prueba" hidden>Modo prueba: los datos se guardan solo en este navegador. Pega la configuración de Firebase en <code>firebase-config.js</code> para usar la base de datos compartida.</p>
+  <p class="aviso" id="aviso-prueba" hidden>Modo prueba: los pedidos se guardan solo en este navegador.</p>
 
   <main>
     <div class="cargando" id="cargando">Cargando…</div>
 
-    <!-- ===== 1. Entregas ===== -->
-    <section class="vista" id="vista-entregas" hidden>
-      <div class="barra">
-        <button class="btn-mini" id="v-ant" aria-label="Viernes anterior">◀</button>
-        <div class="barra-t">
-          <p class="eyebrow">Siguientes entregas</p>
-          <h1 class="titulo" id="v-titulo">Viernes</h1>
-        </div>
-        <button class="btn-mini" id="v-sig" aria-label="Viernes siguiente">▶</button>
+    <!-- ===== Entrar ===== -->
+    <section class="vista" id="vista-login" hidden>
+      <div class="hero">
+        <p class="eyebrow">Chorizos artesanales</p>
+        <h1 class="titulo">Pide para el viernes</h1>
+        <p>Entra una vez, guarda tu dirección y pide en un minuto. Pagas con Nequi y te llega el viernes.</p>
       </div>
-      <div class="chips" id="v-resumen"></div>
-      <button class="btn btn-grande" id="btn-crear">+ Crear pedido</button>
-      <div class="mapa-caja">
-        <div id="mapa" class="mapa"></div>
-        <div class="leyenda"><span class="punto verde"></span> Pagado <span class="punto rojo"></span> Pendiente de pago</div>
+      <div class="tarjeta form">
+        <button class="btn btn-grande" id="entrar-google">Entrar con Google</button>
+        <p class="o">o con tu correo, sin contraseña</p>
+        <form id="f-enlace" class="form">
+          <label class="etq">Correo electrónico
+            <input class="campo" id="correo" type="email" autocomplete="email" required placeholder="tucorreo@hotmail.com">
+          </label>
+          <button class="btn btn-sec">Enviarme un enlace para entrar</button>
+        </form>
+        <p class="nota fuerte" id="enlace-estado"></p>
+        <p class="error" id="login-error"></p>
       </div>
-      <div class="acciones-ruta">
-        <button class="btn btn-sec" id="actualizar-puntos" type="button">Actualizar puntos</button>
-        <a class="btn btn-sec" id="ruta-google" target="_blank" rel="noopener">Ruta en Google Maps</a>
-      </div>
-      <p class="nota" id="ruta-nota"></p>
-      <p class="nota" id="sin-pin"></p>
-      <div id="v-lista" class="lista"></div>
-      <div id="v-atrasados"></div>
     </section>
 
-    <!-- ===== 2. Contabilidad ===== -->
-    <section class="vista" id="vista-contabilidad" hidden>
+    <!-- ===== Pedir ===== -->
+    <section class="vista" id="vista-pedir" hidden>
       <div class="barra">
         <div class="barra-t">
-          <p class="eyebrow">Contabilidad</p>
-          <h1 class="titulo" id="c-titulo">Mes</h1>
-        </div>
-        <input type="month" id="c-mes" class="campo campo-mes" aria-label="Mes">
-      </div>
-
-      <div class="tarjeta">
-        <h2 class="subtitulo">Resultado del mes</h2>
-        <dl class="cuentas" id="c-cuentas"></dl>
-        <p class="nota">Cuenta los pedidos pagados según su viernes de entrega. El costo del producto usa el costo por paquete y por litro de Precios y costos.</p>
-      </div>
-
-      <div class="grid2">
-        <div class="tarjeta destacada">
-          <h2 class="subtitulo">Fondo de gasolina</h2>
-          <dl class="cuentas" id="c-fondo"></dl>
-          <button class="btn btn-sec" data-mov="gasto" data-cat="Gasolina">Registrar tanqueada</button>
-        </div>
-        <div class="tarjeta">
-          <h2 class="subtitulo">Inversiones en el negocio</h2>
-          <p class="cifra" id="c-invertido">$0</p>
-          <button class="btn btn-sec" data-mov="inversion">Registrar inversión</button>
+          <p class="eyebrow" id="saludo">Hola</p>
+          <h1 class="titulo">¿Qué te llevamos?</h1>
         </div>
       </div>
-
-      <h2 class="seccion">Ganancias de los socios</h2>
-      <div class="grid2" id="c-socios"></div>
-
-      <div class="botonera">
-        <button class="btn" data-mov="liquidacion">Liquidar</button>
-        <button class="btn btn-sec" data-mov="gasto">Registrar gasto</button>
-      </div>
-
-      <h2 class="seccion">Movimientos del mes</h2>
-      <div class="tabla-caja"><table class="tabla" id="c-movs"></table></div>
-
-      <h2 class="seccion">Pedidos del mes</h2>
-      <div class="tabla-caja"><table class="tabla" id="c-pedidos"></table></div>
-
-      <details class="tarjeta plegable">
-        <summary class="subtitulo">Precios y costos</summary>
-        <form id="f-precios" class="form"></form>
-      </details>
+      <p class="entrega-info" id="entrega-info"></p>
+      <form id="f-pedir" class="form">
+        <fieldset class="productos" id="productos"></fieldset>
+        <fieldset class="opciones">
+          <legend class="etq">¿Cómo lo recibes?</legend>
+          <label class="check"><input type="radio" name="recibe" value="domi" checked> Domicilio a mi dirección</label>
+          <label class="check"><input type="radio" name="recibe" value="recoge"> Lo recojo</label>
+        </fieldset>
+        <p class="nota" id="dir-pedido"></p>
+        <label class="etq">Notas para este pedido <input class="campo" id="pedir-notas" placeholder="Opcional: hora, portería, etc."></label>
+        <div class="total" id="total"></div>
+        <p class="error" id="pedir-error"></p>
+        <button class="btn btn-grande" id="pedir-btn">Hacer pedido</button>
+      </form>
     </section>
 
-    <!-- ===== 3. Clientes ===== -->
-    <section class="vista" id="vista-clientes" hidden>
+    <!-- ===== Pagar ===== -->
+    <section class="vista" id="vista-pagar" hidden>
       <div class="barra">
+        <button class="btn-mini" id="pagar-volver" aria-label="Volver a mis pedidos">◀</button>
         <div class="barra-t">
-          <p class="eyebrow">Base de datos</p>
-          <h1 class="titulo">Clientes</h1>
+          <p class="eyebrow" id="pagar-codigo">Pedido</p>
+          <h1 class="titulo">Paga con Nequi</h1>
         </div>
-        <button class="btn btn-chico" id="btn-cliente-nuevo">+ Cliente</button>
       </div>
-      <div class="filtros">
-        <input type="search" id="cl-buscar" class="campo" placeholder="Buscar por nombre, teléfono o dirección">
-        <select id="cl-orden" class="campo" aria-label="Ordenar">
-          <option value="nombre">Nombre</option>
-          <option value="pedidos">Más pedidos</option>
-          <option value="gastado">Más compras</option>
-          <option value="reciente">Pedido más reciente</option>
-        </select>
+      <div class="tarjeta pago-caja">
+        <p class="pago-valor">Valor exacto<br><strong id="pagar-total">$0</strong></p>
+        <img class="qr" id="qr" alt="Código QR de Nequi de Cerdísimo Chancho" hidden>
+        <p class="qr-falta" id="qr-falta" hidden>Aquí va el código QR de Nequi.</p>
+        <p class="nota">Escanéalo desde Nequi o desde la app de cualquier banco con Bre-B.</p>
+        <p id="pagar-nequi"></p>
+        <p class="nota">En el mensaje del pago escribe el código <strong id="pagar-codigo-2"></strong> para que lo encontremos rápido.</p>
       </div>
-      <div class="chips" id="cl-resumen"></div>
-      <div class="tabla-caja"><table class="tabla tabla-clientes" id="cl-tabla"></table></div>
+      <form id="f-pagar" class="form">
+        <label class="etq">¿A nombre de quién sale el traslado?
+          <input class="campo" id="comprobante" autocomplete="name" required placeholder="Nombre de quien hizo el pago">
+        </label>
+        <p class="nota">Con este nombre Mariana encuentra tu pago en Nequi. Si pagó otra persona, escribe su nombre.</p>
+        <button class="btn btn-grande">Ya pagué</button>
+        <p class="error" id="pagar-error"></p>
+      </form>
+      <a class="btn btn-sec" id="pagar-whatsapp" target="_blank" rel="noopener" hidden>Enviar la captura por WhatsApp</a>
+      <p class="nota" id="pagar-corte"></p>
     </section>
 
-    <!-- ===== 4. Inventario / producción ===== -->
-    <section class="vista" id="vista-produccion" hidden>
+    <!-- ===== Mis pedidos ===== -->
+    <section class="vista" id="vista-mis" hidden>
       <div class="barra">
-        <button class="btn-mini" id="pr-ant" aria-label="Viernes anterior">◀</button>
         <div class="barra-t">
-          <p class="eyebrow">Inventario y producción</p>
-          <h1 class="titulo" id="pr-titulo">Viernes</h1>
+          <p class="eyebrow">Historial</p>
+          <h1 class="titulo">Mis pedidos</h1>
         </div>
-        <button class="btn-mini" id="pr-sig" aria-label="Viernes siguiente">▶</button>
       </div>
-      <div class="necesidades">
-        <article class="necesidad necesidad--destacada" aria-live="polite">
-          <p class="necesidad-frase" id="pr-frase-paq">Para la próxima entrega debemos tener</p>
-          <p class="necesidad-num cc-outline-md" id="pr-paquetes">0</p>
-          <p class="necesidad-unidad" id="pr-paquetes-u">paquetes de chorizos</p>
-          <p class="necesidad-det" id="pr-paquetes-det"></p>
-        </article>
-        <article class="necesidad" aria-live="polite">
-          <p class="necesidad-frase" id="pr-frase-lit">Para la próxima entrega debemos tener</p>
-          <p class="necesidad-num cc-outline-md" id="pr-litros">0</p>
-          <p class="necesidad-unidad" id="pr-litros-u">litros de guaro</p>
-          <p class="necesidad-det" id="pr-litros-det"></p>
-        </article>
+      <div class="lista" id="mis-lista"></div>
+    </section>
+
+    <!-- ===== Mis datos ===== -->
+    <section class="vista" id="vista-datos" hidden>
+      <div class="barra">
+        <div class="barra-t">
+          <p class="eyebrow">Para tus entregas</p>
+          <h1 class="titulo">Mis datos</h1>
+        </div>
       </div>
-      <div class="chips" id="pr-avance"></div>
-      <p class="nota" id="pr-nota"></p>
-
-      <h2 class="seccion">Qué pidieron</h2>
-      <div class="tabla-caja"><table class="tabla" id="pr-desglose"></table></div>
-
-      <h2 class="seccion">Próximas entregas</h2>
-      <div class="tabla-caja"><table class="tabla tabla-clientes" id="pr-proximas"></table></div>
-      <p class="nota">Las cifras se actualizan solas cada vez que alguien crea, cambia o entrega un pedido. Cuentan los pedidos creados aquí (pagados o no) y los de la app de clientes con el pago aprobado.</p>
+      <p class="aviso aviso-dentro" id="datos-primera" hidden>Antes de tu primer pedido, cuéntanos quién eres y a dónde te lo llevamos.</p>
+      <form id="f-datos" class="form">
+        <label class="etq">Nombre y apellido <input class="campo" id="d-nombre" autocomplete="name" required></label>
+        <label class="etq">Celular con WhatsApp <input class="campo" id="d-tel" type="tel" inputmode="tel" autocomplete="tel" required placeholder="300 123 4567"></label>
+        <label class="etq">Dirección <input class="campo" id="d-dir" autocomplete="street-address" placeholder="Calle 10 # 43-20, apto 501, El Poblado"></label>
+        <label class="etq">Indicaciones <input class="campo" id="d-notas" placeholder="Portería, torre, punto de referencia"></label>
+        <div class="fila-btn">
+          <button type="button" class="btn btn-sec btn-chico" id="d-buscar">Ubicar en el mapa</button>
+          <span class="nota" id="d-estado"></span>
+        </div>
+        <div id="d-mapa" class="mapa mapa-chico"></div>
+        <p class="nota">Si el pin no quedó en tu casa, arrástralo o toca el mapa en el punto exacto.</p>
+        <label class="check autoriza"><input type="checkbox" id="d-autoriza" required> Autorizo el tratamiento de mis datos personales</label>
+        <details class="politica">
+          <summary>Qué hacemos con tus datos</summary>
+          <p>Cerdísimo Chancho (Daniel y Mariana) guarda tu nombre, celular, correo y dirección solo para tomar tus pedidos, entregarlos y avisarte de su estado, según la Ley 1581 de 2012. No los compartimos con nadie. Puedes pedir que los corrijamos o los borremos escribiéndonos por WhatsApp.</p>
+        </details>
+        <p class="error" id="datos-error"></p>
+        <button class="btn btn-grande" id="datos-btn">Guardar mis datos</button>
+        <p class="nota" id="datos-correo"></p>
+      </form>
     </section>
   </main>
 
-  <!-- Crear / editar pedido -->
-  <dialog id="d-pedido" class="dialogo">
-    <form method="dialog" id="f-pedido" class="form">
-      <h2 class="dialogo-t" id="d-pedido-t">Crear pedido</h2>
-      <label class="etq">Cliente
-        <input class="campo" id="p-cliente" list="lista-clientes" autocomplete="off" required placeholder="Escribe un nombre">
-      </label>
-      <datalist id="lista-clientes"></datalist>
-      <p class="nota" id="p-cliente-info"></p>
-      <div id="p-nuevo" class="sub-form" hidden>
-        <p class="nota fuerte">Cliente nuevo: se guardará en la base de datos.</p>
-        <label class="etq">Teléfono <input class="campo" id="p-tel" type="tel" inputmode="tel" placeholder="300 123 4567"></label>
-        <label class="etq">Dirección <input class="campo" id="p-dir" placeholder="Calle 10 # 43-20, apto 501, El Poblado"></label>
-      </div>
-      <div class="fila2">
-        <label class="etq">Fecha del pedido <input class="campo" id="p-fecha" type="date" required></label>
-        <label class="etq">Viernes de entrega <input class="campo" id="p-entrega" type="date" required></label>
-      </div>
-      <fieldset class="productos" id="p-productos"><legend class="etq">¿Qué pidió?</legend></fieldset>
-      <label class="check"><input type="checkbox" id="p-recoge"> Lo recoge (sin domicilio)</label>
-      <label class="check"><input type="checkbox" id="p-pagado"> Ya pagó</label>
-      <label class="etq">Notas <input class="campo" id="p-notas" placeholder="Opcional"></label>
-      <div class="total" id="p-total"></div>
-      <p class="error" id="p-error"></p>
-      <div class="botonera">
-        <button class="btn btn-sec" value="cancelar" formnovalidate>Cancelar</button>
-        <button class="btn" id="p-guardar" value="guardar">Guardar pedido</button>
-      </div>
-    </form>
-  </dialog>
-
-  <!-- Editar cliente -->
-  <dialog id="d-cliente" class="dialogo">
-    <form method="dialog" id="f-cliente" class="form">
-      <h2 class="dialogo-t" id="d-cliente-t">Cliente</h2>
-      <label class="etq">Nombre <input class="campo" id="k-nombre" required></label>
-      <label class="etq">Teléfono <input class="campo" id="k-tel" type="tel" inputmode="tel" placeholder="300 123 4567"></label>
-      <label class="etq">Dirección <input class="campo" id="k-dir" placeholder="Calle 10 # 43-20, El Poblado"></label>
-      <label class="etq">Indicaciones <input class="campo" id="k-notas" placeholder="Apto, portería, punto de referencia"></label>
-      <div class="fila-btn">
-        <button type="button" class="btn btn-sec btn-chico" id="k-buscar">Ubicar dirección en el mapa</button>
-        <span class="nota" id="k-estado"></span>
-      </div>
-      <div id="k-mapa" class="mapa mapa-chico"></div>
-      <p class="nota">Si el pin quedó mal, arrástralo o toca el mapa en el punto exacto.</p>
-      <p class="error" id="k-error"></p>
-      <div class="botonera">
-        <button type="button" class="btn btn-peligro btn-chico" id="k-borrar">Borrar</button>
-        <button class="btn btn-sec" value="cancelar" formnovalidate>Cancelar</button>
-        <button class="btn" value="guardar">Guardar</button>
-      </div>
-    </form>
-  </dialog>
-
-  <!-- Movimiento: gasto, liquidación o inversión -->
-  <dialog id="d-mov" class="dialogo">
-    <form method="dialog" id="f-mov" class="form">
-      <h2 class="dialogo-t" id="d-mov-t">Movimiento</h2>
-      <label class="etq" id="m-socio-l">Socio
-        <select class="campo" id="m-socio"></select>
-      </label>
-      <label class="etq" id="m-cat-l">Categoría
-        <select class="campo" id="m-cat">
-          <option>Gasolina</option><option>Insumos</option><option>Empaques</option><option>Publicidad</option><option>Otro</option>
-        </select>
-      </label>
-      <label class="etq">Monto
-        <input class="campo" id="m-monto" inputmode="numeric" required placeholder="$0">
-      </label>
-      <div class="fila-btn" id="m-todo-caja"><button type="button" class="btn btn-sec btn-chico" id="m-todo">Liquidar todo</button><span class="nota" id="m-disp"></span></div>
-      <label class="etq">Fecha <input class="campo" id="m-fecha" type="date" required></label>
-      <label class="etq">Descripción <input class="campo" id="m-desc" placeholder="Opcional"></label>
-      <p class="nota" id="m-ayuda"></p>
-      <p class="error" id="m-error"></p>
-      <div class="botonera">
-        <button class="btn btn-sec" value="cancelar" formnovalidate>Cancelar</button>
-        <button class="btn" value="guardar">Guardar</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog id="d-login" class="dialogo">
-    <div class="form">
-      <h2 class="dialogo-t">Entrar</h2>
-      <p>Entra con la cuenta de Google de Daniel o de Mariana.</p>
-      <button class="btn" id="login-btn">Entrar con Google</button>
-    </div>
-  </dialog>
-
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="app.js"></script>
+  <script type="module" src="pedidos/app.js"></script>
 </body>
 </html>
