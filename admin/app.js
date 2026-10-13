@@ -1,10 +1,10 @@
-import { crearStore, sembrarSiHaceFalta, modoPrueba } from "./store.js";
+import { crearStore, sembrarSiHaceFalta, modoPrueba } from "../store.js";
 import {
   PRODUCTOS, PRECIOS_BASE, SOCIOS, precios, calcularPedido, hoyISO, sumarDias, viernesDeEntrega, viernesActual,
   fechaLarga, fechaCorta, nombreMes, plata, leerPlata, resumenMes, saldos,
   enlaceGoogle, enlaceApple, enlaceWhatsApp, ordenarDesdeElNorte, ordenDeReparto, enlaceRutaGoogle,
   necesidadesEntrega, viernesConPedidos, ESTADOS, venceAlCorte, codigoPedido
-} from "./negocio.js";
+} from "../negocio.js";
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

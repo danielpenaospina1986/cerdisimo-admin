@@ -1,6 +1,6 @@
 # Cerdísimo Chancho · Administración
 
-App web (un solo HTML, sin instalar nada) para Daniel y Mariana, con cuatro tableros:
+App web (un solo HTML, sin instalar nada) para Daniel y Mariana, en `/admin/`, con cuatro tableros:
 
 1. **Entregas**: pedidos del viernes, mapa con pines (verde = pagado, rojo = pendiente), botón **Crear pedido**, enlaces a Google Maps y Mapas de iPhone por cliente y ruta completa en Google Maps. El botón **Actualizar puntos** numera las paradas desde la más al norte (la producción sale de Girardota) y de ahí siempre a la más cercana; ese orden queda guardado en cada pedido, así Daniel y Mariana ven los mismos números y no cambian al marcar entregas. Los pedidos nuevos o con el pin movido quedan al final hasta que se vuelva a tocar el botón.
 2. **Contabilidad**: por mes, ventas cobradas, costo de producto, ganancia bruta, domicilios al fondo de gasolina, otros gastos y ganancia neta; reparto 50/50, liquidaciones totales o parciales, inversiones, tanqueadas e historial. Incluye el editor de precios y costos.
@@ -9,9 +9,9 @@ App web (un solo HTML, sin instalar nada) para Daniel y Mariana, con cuatro tabl
 
 La primera vez que se abre con la base de datos vacía crea los 5 clientes del 6 de octubre de 2026 (1 paquete cada uno, entrega el viernes 9, pendientes de pago y sin dirección).
 
-## App de pedidos para clientes (`/pedidos`)
+## App de pedidos para clientes (raíz del sitio)
 
-Maqueta funcional de la fase 1: los clientes entran en `…/cerdisimo-admin/pedidos/`, con su cuenta de Google o con un enlace a su correo (sin contraseña), guardan sus datos una vez y piden para el viernes. Usa la misma base de datos que la app admin.
+Fase 1: los clientes entran por la dirección principal del sitio (la raíz, `index.html`; su código está en `pedidos/`). La dirección vieja `/pedidos/` redirige a la raíz. Entran con su cuenta de Google o con un enlace a su correo (sin contraseña), guardan sus datos una vez y piden para el viernes. Usa la misma base de datos que la app admin.
 
 - **Corte**: jueves a las 12 m. Lo pedido antes sale ese viernes; después, el siguiente.
 - **Pago**: el cliente paga al QR de Nequi (archivo `assets/nequi-qr.png`) o al número de Nequi que se configura en Contabilidad → Precios y costos, y escribe a nombre de quién sale el traslado. Mariana aprueba cuando ese nombre y el valor coinciden con lo que entró a Nequi.
@@ -20,6 +20,11 @@ Maqueta funcional de la fase 1: los clientes entran en `…/cerdisimo-admin/pedi
 - **Seguridad** (`firestore.rules`): cada cliente solo ve y edita su ficha y sus pedidos, lee los precios y nunca puede marcar un pedido como pagado o entregado. Al aprobar, la app admin recalcula el total y avisa si no cuadra con los precios vigentes.
 
 Para activarla en Firebase: pegar las reglas nuevas y activar el inicio de sesión con enlace al correo (**Authentication → Método de acceso → Correo electrónico/contraseña → Vínculo de correo electrónico**).
+
+### Dominio propio
+1. En el proveedor del dominio (GoDaddy), DNS: cuatro registros **A** para `@` con `185.199.108.153`, `185.199.109.153`, `185.199.110.153` y `185.199.111.153`, y un **CNAME** `www` → `TU-USUARIO.github.io`. Borrar el registro A de "Parked".
+2. Cuando el dominio ya apunte a GitHub: **Settings → Pages → Custom domain**, escribirlo, guardar y, cuando GitHub lo permita, marcar **Enforce HTTPS**. Las direcciones `github.io` pasan solas al dominio.
+3. Firebase, **Authentication → Configuración → Dominios autorizados**: agregar el dominio y su `www`, o no funcionará el inicio de sesión.
 
 ## Reglas de negocio (de la calculadora "Ganancias por pedido")
 
@@ -54,7 +59,7 @@ Para activarla en Firebase: pegar las reglas nuevas y activar el inicio de sesi�
 Las claves de `firebase-config.js` no son secretas: la seguridad la ponen las reglas y la lista de `socios`.
 
 ### 2. GitHub Pages
-Sube estos archivos a un repositorio y en **Settings → Pages** elige la rama `main` y la carpeta `/ (root)`. La app queda en `https://TU-USUARIO.github.io/NOMBRE-DEL-REPO/`. En el iPhone, desde Safari: Compartir → Agregar a inicio.
+Sube estos archivos a un repositorio y en **Settings → Pages** elige la rama `main` y la carpeta `/ (root)`. La tienda queda en `https://TU-USUARIO.github.io/NOMBRE-DEL-REPO/` y la administración en `…/NOMBRE-DEL-REPO/admin/`. En el iPhone, desde Safari: Compartir → Agregar a inicio.
 
 ### Modo prueba
 Si `firebase-config.js` está vacío, la app funciona igual pero guarda los datos solo en ese navegador.
@@ -64,4 +69,4 @@ Si `firebase-config.js` está vacío, la app funciona igual pero guarda los dato
 - Las direcciones colombianas con "#" no siempre se encuentran exactas: en Clientes se puede arrastrar el pin o tocar el mapa en el punto correcto.
 
 ## Archivos
-`index.html`, `styles.css` (tokens del sistema de diseño), `app.js` (pantallas), `negocio.js` (precios, cuentas y corte), `store.js` (Firestore o modo prueba), `semilla.js` (5 clientes iniciales), `firebase-config.js`, `firestore.rules`. App de clientes: `pedidos/index.html`, `pedidos/app.js`, `pedidos/datos.js`, `pedidos/pedidos.css`.
+Administración: `admin/index.html`, `admin/app.js` (pantallas). Compartidos: `styles.css` (tokens del sistema de diseño), `negocio.js` (precios, cuentas y corte), `store.js` (Firestore o modo prueba), `semilla.js` (5 clientes iniciales), `firebase-config.js`, `firestore.rules`. Tienda para clientes: `index.html`, `pedidos/app.js`, `pedidos/datos.js`, `pedidos/pedidos.css` (`pedidos/index.html` solo redirige a la raíz).

@@ -196,7 +196,7 @@ $("#pagar-volver").onclick = () => { ui.vista = "mis"; pintar(); };
 const qr = $("#qr");
 qr.addEventListener("load", () => { qr.hidden = false; $("#qr-falta").hidden = true; });
 qr.addEventListener("error", () => { qr.hidden = true; $("#qr-falta").hidden = false; });
-qr.src = "../assets/nequi-qr.png";
+qr.src = new URL("../assets/nequi-qr.png", import.meta.url).href;
 
 function pintarPagar() {
   const p = pedidos.find((x) => x.id === ui.pagando);
