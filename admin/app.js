@@ -33,6 +33,7 @@ async function iniciar() {
       }
       $("#cargando").hidden = true;
       pintar();
+      revisarAlertas();
     });
     return sesion;
   } catch (e) {
@@ -139,7 +140,7 @@ function tarjetaPedido(p, n) {
     ? '<button class="btn btn-chico" data-acc="aprobar" data-id="' + p.id + '">Aprobar pago</button>' +
       (p.estado === "por_verificar" ? '<button class="btn btn-sec btn-chico" data-acc="rechazar" data-id="' + p.id + '">Rechazar</button>' : "")
     : '<button class="btn btn-chico" data-acc="pagado" data-id="' + p.id + '">' + (p.pagado ? "Marcar sin pagar" : "Marcar pagado") + "</button>";
-  return '<article class="pedido ' + (p.pagado ? "pagado" : "pendiente") + (p.entregado ? " entregado" : "") + '">' +
+  return '<article class="pedido ' + (p.pagado ? "pagado" : "pendiente") + (p.entregado ? " entregado" : "") + '" data-pedido="' + esc(p.id) + '">' +
     '<div class="pedido-cab">' + (n ? '<span class="pedido-num">' + n + "</span>" : "") +
     '<p class="pedido-nombre">' + esc(nombre) + "</p>" +
     '<span class="estado ' + color + '">' + estadoTxt + "</span>" +
@@ -305,6 +306,152 @@ async function aprobarPago(p) {
   if (!confirm(msg)) return;
   await store.actualizar("pedidos", p.id, { pagado: true, estado: "aprobado", aprobadoEn: new Date().toISOString(), aprobadoPor: correoSocio });
 }
+
+// ---------- Alertas de pagos ----------
+// La campanita cuenta los pedidos de la tienda con el pago reportado y sin revisar, de cualquier
+// viernes. Si un cliente reporta un pago con la administración abierta, suena y sale un aviso.
+const TITULO = document.title;
+const reportesVistos = new Map(); // id del pedido → reportadoEn que ya se vio en esta pestaña
+let alertasListas = false;
+
+const porRevisar = () => datos.pedidos.filter((p) => esWeb(p) && p.estado === "por_verificar")
+  .sort((a, b) => String(a.reportadoEn || "").localeCompare(String(b.reportadoEn || "")));
+
+function revisarAlertas() {
+  const lista = porRevisar();
+  // Solo es nuevo si cambió reportadoEn: así no suena cuando un socio desmarca un pago aprobado
+  const nuevos = lista.filter((p) => p.reportadoEn && reportesVistos.get(p.id) !== p.reportadoEn);
+  datos.pedidos.forEach((p) => { if (p.reportadoEn) reportesVistos.set(p.id, p.reportadoEn); });
+  pintarCampana(lista.length);
+  if ($("#d-alertas").open) pintarAlertas();
+  if (alertasListas && nuevos.length) avisarPago(nuevos);
+  if (!alertasListas) { alertasListas = true; abrirDesdeEnlace(); }
+}
+
+function pintarCampana(n) {
+  const b = $("#alertas");
+  const texto = n === 1 ? "1 pago por revisar" : n + " pagos por revisar";
+  b.hidden = false;
+  b.classList.toggle("hay", n > 0);
+  $("#alertas-t").textContent = texto;
+  $("#alertas-n").textContent = n;
+  b.setAttribute("aria-label", n ? texto : "Alertas de pagos: no hay pagos por revisar");
+  document.title = (n ? "(" + n + ") " : "") + TITULO;
+  // Número sobre el ícono de la pantalla de inicio, donde el teléfono lo permita
+  if ("setAppBadge" in navigator) (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
+}
+
+function pintarAlertas() {
+  const lista = porRevisar();
+  $("#alertas-lista").innerHTML = lista.length
+    ? lista.map((p) => {
+      const c = cliente(p.clienteId) || {};
+      return '<article class="alerta">' +
+        '<div class="pedido-cab"><p class="pedido-nombre">' + esc(c.nombre || p.clienteNombre) + "</p>" +
+        '<span class="pedido-total">' + plata(p.total) + "</span></div>" +
+        '<p class="pago-web"><span class="tag app">App · ' + codigoPedido(p) + "</span> Traslado a nombre de: <strong>" + esc(p.comprobante || "—") + "</strong></p>" +
+        '<p class="nota">Reportado ' + hace(p.reportadoEn) + " · Entrega el " + fechaLarga(p.fechaEntrega) + "</p>" +
+        '<div class="pedido-acc">' +
+        '<button class="btn btn-chico" data-acc="aprobar" data-id="' + esc(p.id) + '">Aprobar pago</button>' +
+        '<button class="btn btn-sec btn-chico" data-acc="rechazar" data-id="' + esc(p.id) + '">Rechazar</button>' +
+        '<button class="btn btn-sec btn-chico" data-ir="' + esc(p.id) + '">Ver pedido</button>' +
+        "</div></article>";
+    }).join("")
+    : '<p class="nota fuerte">Todo al día: no hay pagos por revisar.</p>';
+}
+
+function hace(iso) {
+  const min = Math.floor((Date.now() - new Date(iso)) / 60000);
+  if (!iso || isNaN(min)) return "";
+  if (min < 1) return "hace un momento";
+  if (min < 60) return "hace " + min + " min";
+  if (min < 24 * 60) { const h = Math.floor(min / 60); return "hace " + h + (h === 1 ? " hora" : " horas"); }
+  return "el " + new Date(iso).toLocaleDateString("es-CO", { day: "numeric", month: "long" });
+}
+
+function avisarPago(nuevos) {
+  const p = nuevos[nuevos.length - 1];
+  const c = cliente(p.clienteId) || {};
+  const t = $("#toast");
+  t.innerHTML = '<button class="toast-abrir" type="button"><strong>' +
+    (nuevos.length > 1 ? nuevos.length + " pagos nuevos por revisar" : "Entró un pago por revisar") + "</strong>" +
+    "<span>" + esc(c.nombre || p.clienteNombre) + " · " + plata(p.total) + " · " + codigoPedido(p) + "</span>" +
+    '<span class="toast-ir">Revisar ›</span></button>' +
+    '<button class="toast-x" type="button" aria-label="Cerrar aviso">×</button>';
+  t.hidden = false;
+  clearTimeout(t._fin);
+  t._fin = setTimeout(() => { t.hidden = true; }, 30000);
+  const b = $("#alertas");
+  b.classList.remove("timbre");
+  void b.offsetWidth; // reinicia la animación si ya estaba sonando
+  b.classList.add("timbre");
+  sonar();
+  if (navigator.vibrate) navigator.vibrate([180, 90, 180]);
+}
+
+// Timbre corto de dos notas. El navegador solo deja sonar después de un toque en la página.
+let audio;
+const contextoAudio = () => audio || (audio = new (window.AudioContext || window.webkitAudioContext)());
+["pointerup", "keydown"].forEach((ev) => document.addEventListener(ev, () => { try { contextoAudio().resume(); } catch (e) { /* sin audio */ } }));
+function sonar() {
+  try {
+    const a = contextoAudio();
+    [880, 1318.5].forEach((f, i) => {
+      const t0 = a.currentTime + i * 0.2;
+      const o = a.createOscillator(), g = a.createGain();
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.35, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.6);
+      o.connect(g).connect(a.destination);
+      o.start(t0); o.stop(t0 + 0.65);
+    });
+  } catch (e) { /* sin audio */ }
+}
+
+function abrirAlertas() {
+  $("#toast").hidden = true;
+  pintarAlertas();
+  if (!$("#d-alertas").open) $("#d-alertas").showModal();
+}
+
+// Lleva a Entregas en el viernes del pedido y lo resalta
+function irAPedido(id) {
+  const p = datos.pedidos.find((x) => x.id === id);
+  if (!p || !p.fechaEntrega) return;
+  if ($("#d-alertas").open) $("#d-alertas").close();
+  $("#toast").hidden = true;
+  ui.vista = "entregas";
+  ui.viernes = p.fechaEntrega;
+  document.querySelectorAll(".pestanas button").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.vista === "entregas")));
+  pintar();
+  const tarjeta = $('#v-lista [data-pedido="' + CSS.escape(id) + '"]');
+  if (!tarjeta) return;
+  tarjeta.scrollIntoView({ behavior: "smooth", block: "center" });
+  tarjeta.classList.add("resaltado");
+  setTimeout(() => tarjeta.classList.remove("resaltado"), 2600);
+}
+
+// El correo de aviso enlaza a /admin/#pedido=ID para abrir ese pedido directo
+function abrirDesdeEnlace() {
+  const m = location.hash.match(/^#pedido=([A-Za-z0-9_-]+)$/);
+  if (!m) return;
+  history.replaceState(null, "", location.pathname + location.search);
+  const p = datos.pedidos.find((x) => x.id === m[1]);
+  if (p && p.estado === "por_verificar") abrirAlertas();
+  else irAPedido(m[1]);
+}
+window.addEventListener("hashchange", () => { if (alertasListas) abrirDesdeEnlace(); });
+
+$("#alertas").addEventListener("click", abrirAlertas);
+$("#toast").addEventListener("click", (e) => {
+  if (e.target.closest(".toast-x")) $("#toast").hidden = true;
+  else if (e.target.closest(".toast-abrir")) abrirAlertas();
+});
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-ir]");
+  if (b) irAPedido(b.dataset.ir);
+});
 
 // ---------- Crear / editar pedido ----------
 let pedidoEditando = null;

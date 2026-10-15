@@ -170,6 +170,25 @@
     </section>
   </main>
 
+  <!-- Alertas de pagos reportados desde la tienda -->
+  <button class="alertas" id="alertas" type="button" aria-haspopup="dialog" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path class="campana" d="M6 10.2a6 6 0 0 1 12 0v3.4l1.9 3.4H4.1L6 13.6Z"/><path class="badajo" d="M9.6 19.6a2.5 2.5 0 0 0 4.8 0"/></svg>
+    <span class="alertas-t" id="alertas-t"></span>
+    <span class="alertas-n" id="alertas-n" aria-hidden="true"></span>
+  </button>
+  <div class="toast" id="toast" role="status" aria-live="assertive" hidden></div>
+
+  <dialog id="d-alertas" class="dialogo">
+    <div class="form">
+      <div class="dialogo-cab">
+        <h2 class="dialogo-t">Pagos por revisar</h2>
+        <button class="btn-mini" value="cancelar">Cerrar</button>
+      </div>
+      <p class="nota">Mira en Nequi que haya entrado un traslado a nombre de esa persona por ese valor, y apruébalo.</p>
+      <div class="lista" id="alertas-lista"></div>
+    </div>
+  </dialog>
+
   <!-- Crear / editar pedido -->
   <dialog id="d-pedido" class="dialogo">
     <form method="dialog" id="f-pedido" class="form">
