@@ -59,11 +59,19 @@ $("#f-enlace").addEventListener("submit", async (e) => {
   }
 });
 
-function entrar(u) {
+async function entrar(u) {
   if (usuario && usuario.uid === u.uid) return;
   usuario = u;
   $("#cargando").hidden = false;
   mostrar(null);
+  // Daniel y Mariana que lleguen aquí (por ejemplo con el ícono viejo de la administración) pasan a su app
+  const socio = await store.esSocio(u);
+  if (usuario !== u) return; // salió o cambió de cuenta mientras se revisaba
+  if (socio) {
+    $("#cargando").textContent = "Entrando a la administración…";
+    location.replace(new URL("../admin/", import.meta.url).href);
+    return;
+  }
   $("#salir").hidden = false;
   $("#salir").onclick = () => store.salir();
   store.escucharPrecios((c) => { config = c; ui.cargados.precios = true; listo(); });
