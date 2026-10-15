@@ -38,7 +38,7 @@ Con la cuenta de Google dueña del proyecto de Firebase:
 1. Abrir https://script.new (crea un proyecto nuevo de Apps Script) y ponerle de nombre «Avisos Cerdísimo».
 2. Borrar lo que trae `Código.gs` y pegar el contenido de `avisos-correo/Codigo.gs`.
 3. En **Configuración del proyecto** (el engranaje) marcar **Mostrar el archivo de manifiesto «appsscript.json» en el editor**; volver al **Editor**, abrir `appsscript.json` y reemplazarlo por `avisos-correo/appsscript.json`. Guardar.
-4. Elegir la función `instalar` y tocar **Ejecutar**. Autorizar: *Revisar permisos* → la cuenta → *Configuración avanzada* → *Ir a Avisos Cerdísimo (no seguro)* → *Permitir* (Google avisa porque el script es propio y no está publicado).
+4. Elegir la función `instalar` y tocar **Ejecutar**. Autorizar: *Revisar permisos* → la cuenta → *Configuración avanzada* → *Ir a Avisos Cerdísimo (no seguro)* → marcar **Seleccionar todo** → *Continuar* (Google avisa porque el script es propio y no está publicado).
 5. Llega a los socios el correo «Avisos de pagos activados». Para apagarlo, ejecutar `desinstalar`.
 
 El script lee Firestore con los permisos de esa cuenta (no pasa por `firestore.rules`) y recuerda qué pagos ya avisó. Google deja mandar unos 100 correos al día desde una cuenta Gmail; si se acaba el cupo, avisa al día siguiente y la campanita sigue funcionando.
