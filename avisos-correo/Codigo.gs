@@ -13,8 +13,11 @@ const PROYECTO = "cerdisimo-chancho";
 const ADMIN = "https://cerdisimochancho.com/admin/";
 const DOCS = "https://firestore.googleapis.com/v1/projects/" + PROYECTO + "/databases/(default)/documents";
 const ZONA = "America/Bogota";
+const RECORDAR_DIAS = 30; // cuánto se recuerda cada pago ya avisado
 
 function instalar() {
+  // Si en la pantalla de permisos quedó alguna casilla sin marcar, Google la vuelve a pedir aquí
+  if (ScriptApp.requireAllScopes) ScriptApp.requireAllScopes(ScriptApp.AuthMode.FULL);
   const socios = correosSocios_();
   if (!socios.length) throw new Error("No encontré correos en la colección «socios» de Firestore.");
   quitarAvisos_();
@@ -43,7 +46,7 @@ function revisarPagos() {
     const avisados = JSON.parse(props.getProperty("avisados") || "{}");
     const pendientes = pedidosPorVerificar_();
     // Nuevo = un reporte del cliente que no se ha avisado. Si un socio desmarca un pago que ya
-    // había aprobado, el pedido vuelve a "por_verificar" sin reporte nuevo y no se avisa.
+    // había aprobado, el pedido vuelve a "por_verificar" con el mismo reportadoEn y no se avisa.
     const nuevos = pendientes.filter((p) => avisados[p.id] !== p.reportadoEn && !(p.aprobadoEn > p.reportadoEn));
     try {
       if (nuevos.length) {
@@ -55,11 +58,18 @@ function revisarPagos() {
         });
       }
     } finally {
-      // Solo se recuerdan los que siguen por revisar: si se rechaza y el cliente vuelve a
-      // reportar, llega otro aviso.
-      const siguen = {};
-      pendientes.forEach((p) => { if (avisados[p.id]) siguen[p.id] = avisados[p.id]; });
-      props.setProperty("avisados", JSON.stringify(siguen));
+      // Cada reporte avisado se recuerda 30 días aunque el pedido ya no esté por revisar, y
+      // siempre mientras siga por revisar (si no, volvería a avisar cada minuto). Si se rechaza y
+      // el cliente vuelve a reportar, trae otro reportadoEn y sí llega otro aviso.
+      const limite = new Date(Date.now() - RECORDAR_DIAS * 864e5).toISOString();
+      const siguen = new Set(pendientes.map((p) => p.id));
+      const guardar = {};
+      Object.keys(avisados)
+        .filter((id) => siguen.has(id) || avisados[id] >= limite)
+        .sort((a, b) => (siguen.has(b) - siguen.has(a)) || avisados[b].localeCompare(avisados[a]))
+        .slice(0, 150) // que quepa en una propiedad (9 KB)
+        .forEach((id) => { guardar[id] = avisados[id]; });
+      props.setProperty("avisados", JSON.stringify(guardar));
     }
   } finally {
     candado.releaseLock();
@@ -105,7 +115,7 @@ function pedidosPorVerificar_() {
   });
   return filas.filter((f) => f.document)
     .map((f) => Object.assign(campos_(f.document.fields), { id: f.document.name.split("/").pop() }))
-    .filter((p) => p.origen === "web" && p.reportadoEn);
+    .filter((p) => p.origen === "web" && typeof p.reportadoEn === "string" && p.reportadoEn);
 }
 
 function correosSocios_() {
@@ -123,6 +133,9 @@ function llamar_(metodo, url, cuerpo) {
   const r = UrlFetchApp.fetch(url, opciones);
   const texto = r.getContentText();
   if (r.getResponseCode() >= 300) {
+    if (/ACCESS_TOKEN_SCOPE_INSUFFICIENT|insufficient authentication scopes/i.test(texto)) {
+      throw new Error("Falta un permiso de Google: ejecuta «instalar» otra vez y marca todas las casillas. " + texto.slice(0, 300));
+    }
     throw new Error("Firestore respondió " + r.getResponseCode() + ". ¿Este script corre con la cuenta de Google dueña del proyecto " + PROYECTO + "? " + texto.slice(0, 400));
   }
   return JSON.parse(texto);

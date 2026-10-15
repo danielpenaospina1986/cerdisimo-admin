@@ -66,14 +66,19 @@ async function storeFirebase() {
       }
       return { usuario };
     },
+    // cb(datos, { alDia }): alDia es false mientras algo venga solo de la memoria del teléfono
     escuchar(cb) {
       const datos = vacio();
-      const listos = new Set();
+      const listos = new Set(), delServidor = new Set();
       COLECCIONES.forEach((col) => {
-        fs.onSnapshot(fs.collection(db, col), (snap) => {
+        fs.onSnapshot(fs.collection(db, col), { includeMetadataChanges: true }, (snap) => {
+          const antes = delServidor.has(col);
+          if (snap.metadata.fromCache) delServidor.delete(col); else delServidor.add(col);
+          // Los avisos que solo cambian "escritura pendiente" no repintan nada
+          if (listos.has(col) && !snap.docChanges().length && antes === delServidor.has(col)) return;
           datos[col] = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
           listos.add(col);
-          if (listos.size === COLECCIONES.length) cb(datos);
+          if (listos.size === COLECCIONES.length) cb(datos, { alDia: delServidor.size === COLECCIONES.length });
         }, (err) => alert("Error leyendo " + col + ": " + err.message));
       });
     },

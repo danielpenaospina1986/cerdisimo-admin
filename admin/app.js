@@ -23,7 +23,7 @@ async function iniciar() {
     if (!modoPrueba) { $("#salir").hidden = false; $("#salir").onclick = () => store.salir(); }
     correoSocio = (sesion.usuario && sesion.usuario.email) || "";
     let sembrado = false;
-    store.escuchar(async (d) => {
+    store.escuchar(async (d, info) => {
       // Los pedidos cancelados (por el cliente o por el corte) no cuentan en ninguna pestaña
       cancelarVencidos(d.pedidos);
       datos = { ...d, pedidos: d.pedidos.filter((p) => p.estado !== "cancelado" && !venceAlCorte(p)) };
@@ -33,7 +33,7 @@ async function iniciar() {
       }
       $("#cargando").hidden = true;
       pintar();
-      revisarAlertas();
+      revisarAlertas(!info || info.alDia);
     });
     return sesion;
   } catch (e) {
@@ -317,7 +317,7 @@ let alertasListas = false;
 const porRevisar = () => datos.pedidos.filter((p) => esWeb(p) && p.estado === "por_verificar")
   .sort((a, b) => String(a.reportadoEn || "").localeCompare(String(b.reportadoEn || "")));
 
-function revisarAlertas() {
+function revisarAlertas(alDia) {
   const lista = porRevisar();
   // Solo es nuevo si cambió reportadoEn: así no suena cuando un socio desmarca un pago aprobado
   const nuevos = lista.filter((p) => p.reportadoEn && reportesVistos.get(p.id) !== p.reportadoEn);
@@ -325,7 +325,9 @@ function revisarAlertas() {
   pintarCampana(lista.length);
   if ($("#d-alertas").open) pintarAlertas();
   if (alertasListas && nuevos.length) avisarPago(nuevos);
-  if (!alertasListas) { alertasListas = true; abrirDesdeEnlace(); }
+  datosAlDia = alDia;
+  if (!alertasListas) { alertasListas = true; leerEnlace(); }
+  atenderEnlace();
 }
 
 function pintarCampana(n) {
@@ -389,13 +391,21 @@ function avisarPago(nuevos) {
   if (navigator.vibrate) navigator.vibrate([180, 90, 180]);
 }
 
-// Timbre corto de dos notas. El navegador solo deja sonar después de un toque en la página.
+// Timbre corto de dos notas. El navegador solo deja sonar después de un toque en la página; sin
+// ese toque no suena (si se programara igual, quedaría en cola y sonaría tarde, al primer toque).
 let audio;
-const contextoAudio = () => audio || (audio = new (window.AudioContext || window.webkitAudioContext)());
-["pointerup", "keydown"].forEach((ev) => document.addEventListener(ev, () => { try { contextoAudio().resume(); } catch (e) { /* sin audio */ } }));
-function sonar() {
+try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* sin audio */ }
+function desbloquearAudio() {
   try {
-    const a = contextoAudio();
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state !== "running") audio.resume();
+  } catch (e) { /* sin audio */ }
+}
+["pointerup", "touchend", "keydown"].forEach((ev) => document.addEventListener(ev, desbloquearAudio));
+function sonar() {
+  if (!audio || audio.state !== "running") return;
+  try {
+    const a = audio;
     [880, 1318.5].forEach((f, i) => {
       const t0 = a.currentTime + i * 0.2;
       const o = a.createOscillator(), g = a.createGain();
@@ -432,16 +442,45 @@ function irAPedido(id) {
   setTimeout(() => tarjeta.classList.remove("resaltado"), 2600);
 }
 
-// El correo de aviso enlaza a /admin/#pedido=ID para abrir ese pedido directo
-function abrirDesdeEnlace() {
+// El correo de aviso enlaza a /admin/#pedido=ID para abrir ese pago directo. Los primeros datos
+// pueden venir de la memoria del teléfono, sin el pedido o sin el pago reportado: si no está por
+// revisar, se decide cuando lleguen los del servidor (o a los 8 s, si no hay internet).
+let enlace = null, datosAlDia = false;
+function leerEnlace() {
   const m = location.hash.match(/^#pedido=([A-Za-z0-9_-]+)$/);
-  if (!m) return;
-  history.replaceState(null, "", location.pathname + location.search);
-  const p = datos.pedidos.find((x) => x.id === m[1]);
-  if (p && p.estado === "por_verificar") abrirAlertas();
-  else irAPedido(m[1]);
+  if (m) { soltarEnlace(); enlace = { id: m[1], hasta: Date.now() + 8000 }; }
 }
-window.addEventListener("hashchange", () => { if (alertasListas) abrirDesdeEnlace(); });
+function soltarEnlace() {
+  if (!enlace) return;
+  clearTimeout(enlace.espera);
+  enlace = null;
+  history.replaceState(null, "", location.pathname + location.search);
+}
+function atenderEnlace() {
+  if (!enlace) return;
+  const p = datos.pedidos.find((x) => x.id === enlace.id);
+  const porRevisarYa = p && p.estado === "por_verificar";
+  clearTimeout(enlace.espera);
+  if (!porRevisarYa && !datosAlDia && Date.now() < enlace.hasta) {
+    enlace.espera = setTimeout(atenderEnlace, enlace.hasta - Date.now());
+    return;
+  }
+  soltarEnlace();
+  if (porRevisarYa) abrirAlertas();
+  else if (p) irAPedido(p.id);
+  else mensaje("No encontré ese pedido. Puede que lo hayan cancelado.");
+}
+window.addEventListener("hashchange", () => { if (alertasListas) { leerEnlace(); atenderEnlace(); } });
+// Si mientras tanto la persona ya hizo otra cosa, el enlace no le cambia la pantalla después
+["pointerdown", "keydown"].forEach((ev) => document.addEventListener(ev, soltarEnlace));
+
+function mensaje(texto) {
+  const t = $("#toast");
+  t.innerHTML = '<p class="toast-msg">' + esc(texto) + '</p><button class="toast-x" type="button" aria-label="Cerrar aviso">×</button>';
+  t.hidden = false;
+  clearTimeout(t._fin);
+  t._fin = setTimeout(() => { t.hidden = true; }, 12000);
+}
 
 $("#alertas").addEventListener("click", abrirAlertas);
 $("#toast").addEventListener("click", (e) => {

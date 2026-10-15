@@ -276,6 +276,7 @@ code { font-size: 0.9em; }
 }
 .toast-abrir strong { font-weight: 800; font-size: 16px; }
 .toast-ir { color: var(--rust-deep); font-weight: 800; }
+.toast-msg { flex: 1; margin: 0; padding: 12px 8px 12px 16px; font-weight: 700; }
 .toast-x { width: 44px; font: 800 24px/1 var(--font-body); color: var(--ink); background: var(--cream); border: none; border-left: var(--stroke-md) solid var(--ink); cursor: pointer; }
 .dialogo-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .alerta { background: var(--paper); border: var(--stroke-lg) solid var(--ink); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 12px 14px; }
