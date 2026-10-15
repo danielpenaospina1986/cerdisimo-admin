@@ -34,6 +34,7 @@ function storeLocal() {
     async entrarConGoogle() { cambiarSesion(true); },
     async enviarEnlace() { cambiarSesion(true); },
     async completarEnlace() {},
+    async esSocio() { return false; },
     async salir() { cambiarSesion(false); location.reload(); },
     escucharFicha(uid, cb) { escuchar((d) => cb(d.clientes.find((c) => c.id === uid) || null)); },
     escucharPedidos(uid, cb) { escuchar((d) => cb(d.pedidos.filter((p) => p.uid === uid))); },
@@ -85,6 +86,12 @@ async function storeFirebase() {
       await auth.signInWithEmailLink(a, correo.trim(), location.href);
       localStorage.removeItem(LLAVE_CORREO);
       history.replaceState(null, "", location.pathname);
+    },
+    // ¿Es Daniel o Mariana? (tiene documento en socios/{correo}; las reglas dejan leer solo el propio)
+    async esSocio(u) {
+      if (!u.email) return false;
+      try { return (await fs.getDoc(fs.doc(db, "socios", u.email))).exists(); }
+      catch (e) { return false; }
     },
     async salir() { await auth.signOut(a); location.reload(); },
     escucharFicha(uid, cb) {
