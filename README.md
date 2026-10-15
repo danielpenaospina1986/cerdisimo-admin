@@ -26,6 +26,23 @@ Para activarla en Firebase: pegar las reglas nuevas y activar el inicio de sesi�
 2. Cuando el dominio ya apunte a GitHub: **Settings → Pages → Custom domain**, escribirlo, guardar y, cuando GitHub lo permita, marcar **Enforce HTTPS**. Las direcciones `github.io` pasan solas al dominio.
 3. Firebase, **Authentication → Configuración → Dominios autorizados**: agregar el dominio y su `www`, o no funcionará el inicio de sesión.
 
+## Alertas de pagos
+
+Cuando un cliente reporta un pago en la tienda, el pedido queda *Por verificar pago* y avisa de dos formas:
+
+- **En la administración**: la campanita flotante (abajo a la derecha) cuenta los pagos por revisar de cualquier viernes, y el número también sale en el título de la pestaña. Si llega uno con la administración abierta, suena un timbre y sale un aviso. Al tocar la campanita se ven los pagos con *Aprobar pago*, *Rechazar* y *Ver pedido*.
+- **Por correo** (`avisos-correo/`): un script de Google Apps Script revisa Firestore cada minuto y les escribe a los correos de la colección `socios`, con un botón que abre ese pago en la administración (`/admin/#pedido=ID`).
+
+### Activar el aviso por correo
+Con la cuenta de Google dueña del proyecto de Firebase:
+1. Abrir https://script.new (crea un proyecto nuevo de Apps Script) y ponerle de nombre «Avisos Cerdísimo».
+2. Borrar lo que trae `Código.gs` y pegar el contenido de `avisos-correo/Codigo.gs`.
+3. En **Configuración del proyecto** (el engranaje) marcar **Mostrar el archivo de manifiesto «appsscript.json» en el editor**; volver al **Editor**, abrir `appsscript.json` y reemplazarlo por `avisos-correo/appsscript.json`. Guardar.
+4. Elegir la función `instalar` y tocar **Ejecutar**. Autorizar: *Revisar permisos* → la cuenta → *Configuración avanzada* → *Ir a Avisos Cerdísimo (no seguro)* → *Permitir* (Google avisa porque el script es propio y no está publicado).
+5. Llega a los socios el correo «Avisos de pagos activados». Para apagarlo, ejecutar `desinstalar`.
+
+El script lee Firestore con los permisos de esa cuenta (no pasa por `firestore.rules`) y recuerda qué pagos ya avisó. Google deja mandar unos 100 correos al día desde una cuenta Gmail; si se acaba el cupo, avisa al día siguiente y la campanita sigue funcionando.
+
 ## Reglas de negocio (de la calculadora "Ganancias por pedido")
 
 | Producto | Precio |
@@ -69,4 +86,4 @@ Si `firebase-config.js` está vacío, la app funciona igual pero guarda los dato
 - Las direcciones colombianas con "#" no siempre se encuentran exactas: en Clientes se puede arrastrar el pin o tocar el mapa en el punto correcto.
 
 ## Archivos
-Administración: `admin/index.html`, `admin/app.js` (pantallas). Compartidos: `styles.css` (tokens del sistema de diseño), `negocio.js` (precios, cuentas y corte), `store.js` (Firestore o modo prueba), `semilla.js` (5 clientes iniciales), `firebase-config.js`, `firestore.rules`. Tienda para clientes: `index.html`, `pedidos/app.js`, `pedidos/datos.js`, `pedidos/pedidos.css` (`pedidos/index.html` solo redirige a la raíz).
+Administración: `admin/index.html`, `admin/app.js` (pantallas). Compartidos: `styles.css` (tokens del sistema de diseño), `negocio.js` (precios, cuentas y corte), `store.js` (Firestore o modo prueba), `semilla.js` (5 clientes iniciales), `firebase-config.js`, `firestore.rules`. Aviso por correo: `avisos-correo/Codigo.gs` y `avisos-correo/appsscript.json` (Google Apps Script). Tienda para clientes: `index.html`, `pedidos/app.js`, `pedidos/datos.js`, `pedidos/pedidos.css` (`pedidos/index.html` solo redirige a la raíz).
