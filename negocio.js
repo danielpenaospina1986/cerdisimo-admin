@@ -153,7 +153,7 @@ export function cuentaFabrica(pedidos, movimientos, hasta, costoPaquete) {
   }, 0);
   const pagos = movimientos
     .filter((m) => m.tipo === "proveedor" && Number(m.paquetes) > 0)
-    .map((m) => ({ id: m.id, fecha: m.fecha || "", paquetes: Number(m.paquetes), monto: Number(m.monto) || 0, descripcion: m.descripcion || "", creado: m.creado || "" }))
+    .map((m) => ({ id: m.id, tipo: m.tipo, fecha: m.fecha || "", paquetes: Number(m.paquetes), monto: Number(m.monto) || 0, descripcion: m.descripcion || "", creado: m.creado || "" }))
     .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.creado.localeCompare(a.creado));
   const pagados = pagos.reduce((t, m) => t + m.paquetes, 0);
   const deben = Math.max(0, pedidosFabrica - pagados);

@@ -292,7 +292,12 @@ document.addEventListener("click", async (e) => {
   if (b.dataset.acc === "entregado" && p) await store.actualizar("pedidos", id, { entregado: !p.entregado });
   if (b.dataset.acc === "editar" && p) abrirPedido(p);
   if (b.dataset.acc === "cliente") abrirCliente(cliente(id));
-  if (b.dataset.acc === "borrar-mov" && confirm("¿Borrar este movimiento?")) await store.borrar("movimientos", id);
+  if (b.dataset.acc === "borrar-mov") {
+    const m = datos.movimientos.find((x) => x.id === id);
+    const que = m ? [NOMBRE_MOV[m.tipo], ...detalleMov(m), plata(m.monto), fechaCorta(m.fecha)].filter(Boolean).join(" · ") : "este movimiento";
+    if (confirm("¿Borrar " + que + "? No se puede deshacer.")) await store.borrar("movimientos", id);
+  }
+  if (b.dataset.acc === "editar-prov") { const m = datos.movimientos.find((x) => x.id === id); if (m) abrirProveedor(m); }
   if (b.dataset.acc === "borrar-pedido" && p && confirm("¿Borrar el pedido de " + p.clienteNombre + "?")) await store.borrar("pedidos", id);
 });
 
@@ -803,6 +808,12 @@ function detalleMov(m) {
   return [m.socio || (m.tipo === "inversion" ? "Ambos socios" : ""), m.descripcion];
 }
 
+// Editar (solo pagos a proveedor) y borrar, para las filas de movimientos
+function botonesMov(m) {
+  return (m.tipo === "proveedor" || m.paquetes ? '<button class="x lapiz" data-acc="editar-prov" data-id="' + esc(m.id) + '" aria-label="Editar">✎</button>' : "") +
+    '<button class="x" data-acc="borrar-mov" data-id="' + esc(m.id) + '" aria-label="Borrar">✕</button>';
+}
+
 function pintarContabilidad() {
   const r = resumenMes(datos, ui.mes);
   const s = saldos(datos);
@@ -839,7 +850,7 @@ function pintarContabilidad() {
   $("#c-movs").innerHTML = "<thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th class=num>Monto</th><th></th></tr></thead><tbody>" +
     (movs.length ? movs.map((m) => "<tr><td>" + fechaCorta(m.fecha) + "</td><td>" + NOMBRE_MOV[m.tipo] + "</td><td>" +
       esc(detalleMov(m).filter(Boolean).join(" · ")) +
-      '</td><td class="num">' + plata(m.monto) + '</td><td><button class="x" data-acc="borrar-mov" data-id="' + m.id + '" aria-label="Borrar">✕</button></td></tr>').join("")
+      '</td><td class="num">' + plata(m.monto) + '</td><td class="acciones">' + botonesMov(m) + "</td></tr>").join("")
       : '<tr class="vacia"><td colspan="5">Sin movimientos este mes.</td></tr>') + "</tbody>";
 
   const ps = r.pedidos.slice().sort((a, b) => b.fechaPedido.localeCompare(a.fechaPedido));
@@ -882,9 +893,14 @@ function pintarNequiYFabrica(s) {
   // Cada pago es un corte: lo que se le debía a la fábrica hasta ese día, sin importar el viernes
   $("#c-fabrica-caja").hidden = !f.pagos.length;
   $("#c-fabrica-resumen").textContent = "Pagos a la fábrica (" + f.pagos.length + ")";
-  $("#c-fabrica-pagos").innerHTML = "<thead><tr><th>Fecha</th><th class=num>Paq.</th><th class=num>Monto</th></tr></thead><tbody>" +
+  // Dos pagos iguales (misma fecha, paquetes y monto) casi siempre son el mismo pago guardado dos veces
+  const clave = (x) => [x.fecha, x.paquetes, x.monto].join("|");
+  const veces = {};
+  f.pagos.forEach((x) => { veces[clave(x)] = (veces[clave(x)] || 0) + 1; });
+  $("#c-fabrica-pagos").innerHTML = "<thead><tr><th>Fecha</th><th class=num>Paq.</th><th class=num>Monto</th><th></th></tr></thead><tbody>" +
     f.pagos.map((x) => "<tr><td>" + fechaCorta(x.fecha) + (x.descripcion ? '<br><span class="nota">' + esc(x.descripcion) + "</span>" : "") +
-      '</td><td class="num">' + x.paquetes + '</td><td class="num">' + plata(x.monto) + "</td></tr>").join("") + "</tbody>";
+      (veces[clave(x)] > 1 ? '<br><span class="tag rojo">¿Repetido?</span>' : "") +
+      '</td><td class="num">' + x.paquetes + '</td><td class="num">' + plata(x.monto) + '</td><td class="acciones">' + botonesMov(x) + "</td></tr>").join("") + "</tbody>";
 }
 
 // ---------- Pago a proveedor ----------
@@ -895,19 +911,36 @@ const PROVEEDORES = {
   licorera: { nombre: "Licorera", nota: "el costo del aguardiente ya se resta en cada pedido pagado." },
 };
 let montoProveedorTocado = false;
-$("#btn-proveedor").addEventListener("click", () => {
-  const f = fabrica();
-  $("#pv-tipo").value = "fabrica";
-  $("#pv-paq").value = f.deben || "";
-  $("#pv-monto").value = "";
-  $("#pv-fecha").value = hoyISO();
-  $("#pv-desc").value = "";
+let pagoEditado = null; // el movimiento que se está editando, o null si es un pago nuevo
+$("#btn-proveedor").addEventListener("click", () => abrirProveedor(null));
+
+// Abre el pago a proveedor: nuevo (mov = null) o para corregir uno ya guardado
+function abrirProveedor(mov) {
+  pagoEditado = mov;
+  const tipo = !mov ? "fabrica" : Number(mov.paquetes) > 0 || mov.proveedor === PROVEEDORES.fabrica.nombre ? "fabrica" : "licorera";
+  $("#pv-titulo").textContent = mov ? "Editar pago" : "Pago a proveedor";
+  const otro = $("#pv-tipo").querySelector('option[value="otro"]');
+  otro.hidden = otro.disabled = !!mov; // al corregir un pago no se cambia a gasto
+  $("#pv-tipo").value = tipo;
+  $("#pv-paq").value = mov ? (Number(mov.paquetes) || "") : (fabrica().deben || "");
+  $("#pv-monto").value = mov ? plata(Number(mov.monto) || 0) : "";
+  $("#pv-fecha").value = mov ? mov.fecha || hoyISO() : hoyISO();
+  $("#pv-desc").value = mov ? mov.descripcion || "" : "";
   $("#pv-error").textContent = "";
   $("#pv-guardar").disabled = false;
-  montoProveedorTocado = false;
+  // Al editar se respeta el monto guardado, salvo que sea justo paquetes × costo (entonces sigue a los paquetes)
+  montoProveedorTocado = !!mov && Number(mov.monto) !== (Number(mov.paquetes) || 0) * precios(datos).costoPaquete;
   formaProveedor();
   $("#d-proveedor").showModal();
-});
+}
+
+// Lo que se le debe a la fábrica sin contar el pago que se está editando
+function deudaFabrica() {
+  const f = fabrica();
+  const pagados = f.pagados - (pagoEditado ? Number(pagoEditado.paquetes) || 0 : 0);
+  const deben = Math.max(0, f.pedidos - pagados);
+  return { deben, debePlata: deben * precios(datos).costoPaquete };
+}
 
 // Muestra los campos según el proveedor y calcula el monto de los paquetes si no lo escribieron a mano
 function formaProveedor() {
@@ -923,9 +956,10 @@ function formaProveedor() {
   $("#pv-paq").required = esFabrica;
   $("#pv-guardar").textContent = prov ? "Guardar" : "Ir a gasto";
   const costo = precios(datos).costoPaquete;
-  const f = fabrica();
+  const d = deudaFabrica();
+  const sinEste = pagoEditado ? " sin contar este pago" : "";
   $("#pv-deuda").textContent = esFabrica
-    ? (f.deben ? "Debemos " + f.deben + " " + plural(f.deben, "paquete", "paquetes") + " (" + plata(f.debePlata) + ")." : "No debemos paquetes a la fábrica.") +
+    ? (d.deben ? "Debemos " + d.deben + " " + plural(d.deben, "paquete", "paquetes") + " (" + plata(d.debePlata) + ")" + sinEste + "." : "No debemos paquetes a la fábrica" + sinEste + ".") +
       " Cada paquete cuesta " + plata(costo) + " (se cambia en Precios y costos)."
     : prov ? ""
     : "Los empaques, insumos y demás compras no están en el costo por paquete ni por litro, así que se restan de la ganancia del mes: se registran como gasto.";
@@ -954,15 +988,18 @@ $("#f-proveedor").addEventListener("submit", async (e) => {
   const paquetes = esFabrica ? Number($("#pv-paq").value) : 0;
   if (esFabrica && !(Number.isInteger(paquetes) && paquetes >= 1)) { $("#pv-error").textContent = "Escribe cuántos paquetes se pagan."; return; }
   if (!monto) { $("#pv-error").textContent = "Escribe el monto."; return; }
-  const f = fabrica();
-  if (esFabrica && paquetes > f.deben &&
-    !confirm("Se deben " + f.deben + " " + plural(f.deben, "paquete", "paquetes") + " y vas a pagar " + paquetes + ". ¿Guardar los demás como pagados por adelantado?")) return;
-  const mov = { tipo: "proveedor", proveedor: prov.nombre, monto, fecha: $("#pv-fecha").value, descripcion: $("#pv-desc").value.trim(), creado: new Date().toISOString() };
-  if (esFabrica) mov.paquetes = paquetes;
+  const d = deudaFabrica();
+  if (esFabrica && paquetes > d.deben &&
+    !confirm("Se deben " + d.deben + " " + plural(d.deben, "paquete", "paquetes") + " y vas a pagar " + paquetes + ". ¿Guardar los demás como pagados por adelantado?")) return;
+  const campos = { tipo: "proveedor", proveedor: prov.nombre, monto, fecha: $("#pv-fecha").value, descripcion: $("#pv-desc").value.trim(), paquetes };
   // Un solo pago por toque: mientras se guarda, el botón no vuelve a guardar
   if ($("#pv-guardar").disabled) return;
   $("#pv-guardar").disabled = true;
-  try { await store.agregar("movimientos", mov); $("#d-proveedor").close(); }
+  try {
+    if (pagoEditado) await store.actualizar("movimientos", pagoEditado.id, { ...campos, editado: new Date().toISOString() });
+    else await store.agregar("movimientos", { ...campos, creado: new Date().toISOString() });
+    $("#d-proveedor").close();
+  }
   catch (x) { $("#pv-error").textContent = "No se pudo guardar: " + x.message; }
   finally { $("#pv-guardar").disabled = false; }
 });
