@@ -144,30 +144,22 @@ export function saldoNequi(datos) {
 
 // Cuenta con la fábrica de chorizos. Pedidos a la fábrica = los paquetes de los pedidos que se
 // producen (`pedidos` ya viene filtrado a los confirmados) con entrega hasta el viernes `hasta`.
-// Pagados = los paquetes de los pagos a proveedor que llevan paquetes. Lo pagado se reparte del
-// viernes más viejo al más nuevo para saber qué viernes ya están pagos.
+// Pagados = los paquetes de los pagos a la fábrica. Se le paga por cortes (cada 15 o 20 días, lo que
+// se deba hasta ese día), así que es una sola cuenta corrida: lo pedido menos lo pagado.
 export function cuentaFabrica(pedidos, movimientos, hasta, costoPaquete) {
-  const porViernes = new Map();
-  pedidos.forEach((p) => {
+  const pedidosFabrica = pedidos.reduce((t, p) => {
     const n = Number(p.paquetes) || 0;
-    if (!p.fechaEntrega || p.fechaEntrega > hasta || !n) return;
-    porViernes.set(p.fechaEntrega, (porViernes.get(p.fechaEntrega) || 0) + n);
-  });
-  const pagos = movimientos.filter((m) => m.tipo === "proveedor" && Number(m.paquetes) > 0);
-  const pagados = pagos.reduce((t, m) => t + Number(m.paquetes), 0);
-  const pagadoPlata = pagos.reduce((t, m) => t + (Number(m.monto) || 0), 0);
-  let resto = pagados;
-  const viernes = [...porViernes.keys()].sort().map((v) => {
-    const paquetes = porViernes.get(v);
-    const cubiertos = Math.min(paquetes, resto);
-    resto -= cubiertos;
-    return { viernes: v, paquetes, pagados: cubiertos, debe: paquetes - cubiertos };
-  });
-  const pedidosFabrica = viernes.reduce((t, x) => t + x.paquetes, 0);
+    return p.fechaEntrega && p.fechaEntrega <= hasta && n > 0 ? t + n : t;
+  }, 0);
+  const pagos = movimientos
+    .filter((m) => m.tipo === "proveedor" && Number(m.paquetes) > 0)
+    .map((m) => ({ id: m.id, fecha: m.fecha || "", paquetes: Number(m.paquetes), monto: Number(m.monto) || 0, descripcion: m.descripcion || "", creado: m.creado || "" }))
+    .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.creado.localeCompare(a.creado));
+  const pagados = pagos.reduce((t, m) => t + m.paquetes, 0);
   const deben = Math.max(0, pedidosFabrica - pagados);
   return {
     pedidos: pedidosFabrica, pagados, deben, debePlata: deben * (Number(costoPaquete) || 0),
-    adelantados: Math.max(0, pagados - pedidosFabrica), pagadoPlata, viernes
+    adelantados: Math.max(0, pagados - pedidosFabrica), pagadoPlata: pagos.reduce((t, m) => t + m.monto, 0), pagos
   };
 }
 

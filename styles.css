@@ -178,7 +178,7 @@ code { font-size: 0.9em; }
 .grid2 { display: grid; grid-template-columns: 1fr; gap: 0 16px; }
 @media (min-width: 680px) { .grid2 { grid-template-columns: 1fr 1fr; } }
 .grid2 > * { min-width: 0; } /* que una tabla ancha no estire la columna en el celular */
-.grid2.arriba:has(.por-viernes[open]) { align-items: start; } /* con la tabla abierta, Nequi no se estira */
+.grid2.arriba:has(.cortes[open]) { align-items: start; } /* con la tabla abierta, Nequi no se estira */
 .cuentas { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; }
 .cuentas dt { font-weight: 700; }
 .cuentas dd { margin: 0; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -231,13 +231,12 @@ code { font-size: 0.9em; }
 .total { background: var(--rust-deep); color: var(--paper); border: var(--stroke-lg) solid var(--ink); border-radius: 14px; padding: 10px 14px; font-weight: 700; }
 .total strong { font: 400 26px/1 var(--font-display); color: var(--mustard); letter-spacing: .02em; }
 .plegable summary { cursor: pointer; margin: 0; }
-.por-viernes { margin: 12px 0; }
-.por-viernes summary { cursor: pointer; font-weight: 800; color: var(--rust-deep); }
-.por-viernes[open] summary { margin-bottom: 8px; }
-.por-viernes[hidden] { display: none; }
-.por-viernes .tag { white-space: nowrap; }
-.por-viernes .tabla-caja { max-height: 320px; overflow-y: auto; }
-.por-viernes thead th { position: sticky; top: 0; z-index: 1; }
+.cortes { margin: 12px 0; }
+.cortes summary { cursor: pointer; font-weight: 800; color: var(--rust-deep); }
+.cortes[open] summary { margin-bottom: 8px; }
+.cortes[hidden] { display: none; }
+.cortes .tabla-caja { max-height: 320px; overflow-y: auto; }
+.cortes thead th { position: sticky; top: 0; z-index: 1; }
 .plegable[open] summary { margin-bottom: 12px; }
 
 /* Alertas de pagos (administración): campanita flotante, aviso y lista */
