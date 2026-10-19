@@ -879,11 +879,12 @@ function pintarNequiYFabrica(s) {
     fila("Valor de lo que debemos", plata(f.debePlata)) +
     (f.adelantados ? fila("Pagados por adelantado", paq(f.adelantados)) : "") +
     fila("Pagado a la fábrica en total", plata(f.pagadoPlata));
-  const vs = f.viernes.slice().reverse();
-  $("#c-fabrica-caja").hidden = !vs.length;
-  $("#c-fabrica-viernes").innerHTML = "<thead><tr><th>Viernes</th><th class=num>Paq.</th><th class=num>Pagados</th><th>Estado</th></tr></thead><tbody>" +
-    vs.map((x) => "<tr><td>" + fechaCorta(x.viernes).replace(/ \d{4}$/, "") + '</td><td class="num">' + x.paquetes + '</td><td class="num">' + x.pagados + "</td><td>" +
-      (x.debe ? '<span class="tag rojo">Debemos ' + x.debe + "</span>" : '<span class="tag verde">Pagado</span>') + "</td></tr>").join("") + "</tbody>";
+  // Cada pago es un corte: lo que se le debía a la fábrica hasta ese día, sin importar el viernes
+  $("#c-fabrica-caja").hidden = !f.pagos.length;
+  $("#c-fabrica-resumen").textContent = "Pagos a la fábrica (" + f.pagos.length + ")";
+  $("#c-fabrica-pagos").innerHTML = "<thead><tr><th>Fecha</th><th class=num>Paq.</th><th class=num>Monto</th></tr></thead><tbody>" +
+    f.pagos.map((x) => "<tr><td>" + fechaCorta(x.fecha) + (x.descripcion ? '<br><span class="nota">' + esc(x.descripcion) + "</span>" : "") +
+      '</td><td class="num">' + x.paquetes + '</td><td class="num">' + plata(x.monto) + "</td></tr>").join("") + "</tbody>";
 }
 
 // ---------- Pago a proveedor ----------
@@ -902,6 +903,7 @@ $("#btn-proveedor").addEventListener("click", () => {
   $("#pv-fecha").value = hoyISO();
   $("#pv-desc").value = "";
   $("#pv-error").textContent = "";
+  $("#pv-guardar").disabled = false;
   montoProveedorTocado = false;
   formaProveedor();
   $("#d-proveedor").showModal();
@@ -957,8 +959,12 @@ $("#f-proveedor").addEventListener("submit", async (e) => {
     !confirm("Se deben " + f.deben + " " + plural(f.deben, "paquete", "paquetes") + " y vas a pagar " + paquetes + ". ¿Guardar los demás como pagados por adelantado?")) return;
   const mov = { tipo: "proveedor", proveedor: prov.nombre, monto, fecha: $("#pv-fecha").value, descripcion: $("#pv-desc").value.trim(), creado: new Date().toISOString() };
   if (esFabrica) mov.paquetes = paquetes;
+  // Un solo pago por toque: mientras se guarda, el botón no vuelve a guardar
+  if ($("#pv-guardar").disabled) return;
+  $("#pv-guardar").disabled = true;
   try { await store.agregar("movimientos", mov); $("#d-proveedor").close(); }
   catch (x) { $("#pv-error").textContent = "No se pudo guardar: " + x.message; }
+  finally { $("#pv-guardar").disabled = false; }
 });
 
 // ---------- Movimientos ----------
@@ -976,6 +982,7 @@ function abrirMov(tipo, cat) {
   $("#m-todo-caja").hidden = tipo === "gasto";
   $("#m-todo").hidden = tipo !== "liquidacion";
   $("#m-monto").value = ""; $("#m-desc").value = ""; $("#m-fecha").value = hoyISO(); $("#m-error").textContent = "";
+  $("#m-guardar").disabled = false;
   $("#m-ayuda").textContent = {
     gasto: "La gasolina sale del fondo de gasolina. Los demás gastos se restan de la ganancia neta del mes.",
     liquidacion: "Plata que el socio saca del negocio. Se descuenta de su disponible.",
@@ -1008,8 +1015,12 @@ $("#f-mov").addEventListener("submit", async (e) => {
     const x = saldos(datos).socios[mov.socio];
     if (monto > x.disponible + 0.5 && !confirm(mov.socio + " tiene disponible " + plata(x.disponible) + ". ¿Liquidar " + plata(monto) + " de todos modos?")) return;
   }
+  // Un solo movimiento por toque: mientras se guarda, el botón no vuelve a guardar
+  if ($("#m-guardar").disabled) return;
+  $("#m-guardar").disabled = true;
   try { await store.agregar("movimientos", mov); $("#d-mov").close(); }
   catch (x) { $("#m-error").textContent = "No se pudo guardar: " + x.message; }
+  finally { $("#m-guardar").disabled = false; }
 });
 
 // ---------- Precios y costos ----------

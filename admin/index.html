@@ -83,9 +83,9 @@
         <div class="tarjeta">
           <h2 class="subtitulo">Fábrica de chorizos</h2>
           <dl class="cuentas" id="c-fabrica"></dl>
-          <details class="por-viernes" id="c-fabrica-caja">
-            <summary>Ver por viernes</summary>
-            <div class="tabla-caja"><table class="tabla" id="c-fabrica-viernes"></table></div>
+          <details class="cortes" id="c-fabrica-caja">
+            <summary id="c-fabrica-resumen">Pagos a la fábrica</summary>
+            <div class="tabla-caja"><table class="tabla" id="c-fabrica-pagos"></table></div>
           </details>
           <button class="btn btn-sec" id="btn-proveedor" type="button">Registrar pago a proveedor</button>
         </div>
@@ -314,7 +314,7 @@
       <p class="error" id="m-error"></p>
       <div class="botonera">
         <button class="btn btn-sec" value="cancelar" formnovalidate>Cancelar</button>
-        <button class="btn" value="guardar">Guardar</button>
+        <button class="btn" value="guardar" id="m-guardar">Guardar</button>
       </div>
     </form>
   </dialog>
