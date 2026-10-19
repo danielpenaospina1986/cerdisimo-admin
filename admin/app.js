@@ -919,7 +919,7 @@ function formaProveedor() {
   $("#pv-paq-l").hidden = !esFabrica;
   $("#pv-paq").disabled = !esFabrica;
   $("#pv-paq").required = esFabrica;
-  $("#pv-guardar").textContent = prov ? "Guardar" : "Registrar como gasto";
+  $("#pv-guardar").textContent = prov ? "Guardar" : "Ir a gasto";
   const costo = precios(datos).costoPaquete;
   const f = fabrica();
   $("#pv-deuda").textContent = esFabrica
