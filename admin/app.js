@@ -847,9 +847,10 @@ function pintarContabilidad() {
     .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "") || (b.creado || "").localeCompare(a.creado || ""));
   $("#c-inv-caja").hidden = !invs.length;
   $("#c-inv-resumen").textContent = "Inversiones registradas (" + invs.length + ")";
-  $("#c-inversiones").innerHTML = "<thead><tr><th>Fecha</th><th>Socio</th><th class=num>Monto</th><th></th></tr></thead><tbody>" +
-    invs.map((m) => "<tr><td>" + fechaCorta(m.fecha) + (m.descripcion ? '<br><span class="nota">' + esc(m.descripcion) + "</span>" : "") +
-      "</td><td>" + esc(m.socio || "Ambos") + '</td><td class="num">' + plata(m.monto) + '</td><td class="acciones">' + botonesMov(m) + "</td></tr>").join("") + "</tbody>";
+  // Fecha, socio y nota en una sola celda, para que ✎ y ✕ quepan con la tarjeta a media pantalla o en un celular angosto
+  $("#c-inversiones").innerHTML = "<thead><tr><th>Inversión</th><th class=num>Monto</th><th></th></tr></thead><tbody>" +
+    invs.map((m) => "<tr><td>" + fechaCorta(m.fecha) + '<br><span class="nota">' + esc(m.socio || "Ambos socios") + (m.descripcion ? " · " + esc(m.descripcion) : "") +
+      '</span></td><td class="num">' + plata(m.monto) + '</td><td class="acciones">' + botonesMov(m) + "</td></tr>").join("") + "</tbody>";
 
   $("#c-socios").innerHTML = SOCIOS.map((n) => {
     const x = s.socios[n];
@@ -859,11 +860,12 @@ function pintarContabilidad() {
   }).join("");
 
   const movs = datos.movimientos.filter((m) => (m.fecha || "").startsWith(ui.mes)).sort((a, b) => b.fecha.localeCompare(a.fecha));
-  $("#c-movs").innerHTML = "<thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th class=num>Monto</th><th></th></tr></thead><tbody>" +
-    (movs.length ? movs.map((m) => "<tr><td>" + fechaCorta(m.fecha) + "</td><td>" + NOMBRE_MOV[m.tipo] + "</td><td>" +
-      esc(detalleMov(m).filter(Boolean).join(" · ")) +
+  // El tipo va dentro del detalle (sin columna aparte) para que ✎ y ✕ quepan en un celular de 360 px
+  $("#c-movs").innerHTML = "<thead><tr><th>Fecha</th><th>Detalle</th><th class=num>Monto</th><th></th></tr></thead><tbody>" +
+    (movs.length ? movs.map((m) => "<tr><td>" + fechaCorta(m.fecha) + "</td><td><strong>" + NOMBRE_MOV[m.tipo] + "</strong>" +
+      detalleMov(m).filter(Boolean).map((t) => " · " + esc(t)).join("") +
       '</td><td class="num">' + plata(m.monto) + '</td><td class="acciones">' + botonesMov(m) + "</td></tr>").join("")
-      : '<tr class="vacia"><td colspan="5">Sin movimientos este mes.</td></tr>') + "</tbody>";
+      : '<tr class="vacia"><td colspan="4">Sin movimientos este mes.</td></tr>') + "</tbody>";
 
   const ps = r.pedidos.slice().sort((a, b) => b.fechaPedido.localeCompare(a.fechaPedido));
   $("#c-pedidos").innerHTML = "<thead><tr><th>Pedido</th><th>Entrega</th><th>Cliente</th><th>Producto</th><th class=num>Total</th><th class=num>Ganancia</th><th>Pago</th></tr></thead><tbody>" +
