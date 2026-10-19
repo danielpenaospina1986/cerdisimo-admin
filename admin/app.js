@@ -3,7 +3,7 @@ import {
   PRODUCTOS, PRECIOS_BASE, SOCIOS, precios, calcularPedido, hoyISO, sumarDias, viernesDeEntrega, viernesActual,
   fechaLarga, fechaCorta, nombreMes, plata, leerPlata, resumenMes, saldos,
   enlaceGoogle, enlaceApple, enlaceWhatsApp, ordenarDesdeElNorte, ordenDeReparto, enlaceRutaGoogle,
-  necesidadesEntrega, viernesConPedidos, ESTADOS, venceAlCorte, codigoPedido
+  necesidadesEntrega, viernesConPedidos, ESTADOS, venceAlCorte, pasoElCorte, codigoPedido, saldoNequi, cuentaFabrica
 } from "../negocio.js";
 
 const $ = (s) => document.querySelector(s);
@@ -794,12 +794,20 @@ $("#c-mes").onchange = () => { ui.mes = $("#c-mes").value || hoyISO().slice(0, 7
 
 function fila(dt, dd, clase) { return '<div class="' + (clase || "") + '" style="display:contents"><dt>' + dt + "</dt><dd>" + dd + "</dd></div>"; }
 
-const NOMBRE_MOV = { gasto: "Gasto", liquidacion: "Liquidación", inversion: "Inversión" };
+const NOMBRE_MOV = { gasto: "Gasto", liquidacion: "Liquidación", inversion: "Inversión", proveedor: "Proveedor" };
+
+// Detalle de un movimiento en la tabla del mes
+function detalleMov(m) {
+  if (m.tipo === "gasto") return [m.categoria, m.descripcion];
+  if (m.tipo === "proveedor") return [m.proveedor, m.paquetes ? m.paquetes + " " + plural(Number(m.paquetes), "paquete", "paquetes") : "", m.descripcion];
+  return [m.socio || (m.tipo === "inversion" ? "Ambos socios" : ""), m.descripcion];
+}
 
 function pintarContabilidad() {
   const r = resumenMes(datos, ui.mes);
   const s = saldos(datos);
   $("#c-titulo").textContent = nombreMes(ui.mes);
+  pintarNequiYFabrica(s);
   $("#c-cuentas").innerHTML =
     fila("Ventas cobradas (" + r.pagados.length + " pedidos, " + r.paquetes + " paq.)", plata(r.ventas)) +
     fila("Costo de chorizos y aguardiente", "−" + plata(r.costoProducto), "menos") +
@@ -830,7 +838,7 @@ function pintarContabilidad() {
   const movs = datos.movimientos.filter((m) => (m.fecha || "").startsWith(ui.mes)).sort((a, b) => b.fecha.localeCompare(a.fecha));
   $("#c-movs").innerHTML = "<thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th class=num>Monto</th><th></th></tr></thead><tbody>" +
     (movs.length ? movs.map((m) => "<tr><td>" + fechaCorta(m.fecha) + "</td><td>" + NOMBRE_MOV[m.tipo] + "</td><td>" +
-      esc([m.tipo === "gasto" ? m.categoria : m.socio || (m.tipo === "inversion" ? "Ambos socios" : ""), m.descripcion].filter(Boolean).join(" · ")) +
+      esc(detalleMov(m).filter(Boolean).join(" · ")) +
       '</td><td class="num">' + plata(m.monto) + '</td><td><button class="x" data-acc="borrar-mov" data-id="' + m.id + '" aria-label="Borrar">✕</button></td></tr>').join("")
       : '<tr class="vacia"><td colspan="5">Sin movimientos este mes.</td></tr>') + "</tbody>";
 
@@ -843,6 +851,99 @@ function pintarContabilidad() {
 
   pintarPrecios();
 }
+
+// ---------- Nequi y fábrica (de todo el tiempo, no del mes elegido) ----------
+// Hasta qué viernes ya se le pidió producción a la fábrica: el de la próxima entrega
+// A la fábrica se le pide cuando cierra el corte del jueves: hasta ahí cuentan los paquetes de esta semana
+const viernesFabrica = () => { const v = viernesActual(); return pasoElCorte(v) ? v : sumarDias(v, -7); };
+const fabrica = () => cuentaFabrica(datos.pedidos.filter(confirmado), datos.movimientos, viernesFabrica(), precios(datos).costoPaquete);
+
+function pintarNequiYFabrica(s) {
+  const n = saldoNequi(datos);
+  const f = fabrica();
+  $("#c-nequi").textContent = plata(n.saldo);
+  $("#c-nequi-det").innerHTML =
+    fila("Cobrado a clientes", plata(n.cobrado)) +
+    fila("Pagado a proveedores", "−" + plata(n.proveedores), "menos") +
+    fila("Gastos (gasolina y otros)", "−" + plata(n.gastos), "menos") +
+    fila("Liquidado a los socios", "−" + plata(n.liquidado), "menos") +
+    fila("Inversiones", "−" + plata(n.invertido), "menos");
+  $("#c-nequi-nota").textContent = "Desde el primer pedido, suponiendo que toda la plata entra y sale por Nequi. De esa plata, " +
+    plata(Math.max(0, s.saldoFondo)) + " son del fondo de gasolina y " + plata(f.debePlata) + " es lo que le debemos a la fábrica.";
+
+  const paq = (x) => x + " paq.";
+  $("#c-fabrica").innerHTML =
+    fila("Pedidos a la fábrica (hasta el " + fechaCorta(viernesFabrica()).replace(/ \d{4}$/, "") + ")", paq(f.pedidos)) +
+    fila("Pagados", paq(f.pagados), "menos") +
+    fila("Debemos", paq(f.deben), "suma") +
+    fila("Valor de lo que debemos", plata(f.debePlata)) +
+    (f.adelantados ? fila("Pagados por adelantado", paq(f.adelantados)) : "") +
+    fila("Pagado a la fábrica en total", plata(f.pagadoPlata));
+  const vs = f.viernes.slice().reverse();
+  $("#c-fabrica-caja").hidden = !vs.length;
+  $("#c-fabrica-viernes").innerHTML = "<thead><tr><th>Viernes</th><th class=num>Paq.</th><th class=num>Pagados</th><th>Estado</th></tr></thead><tbody>" +
+    vs.map((x) => "<tr><td>" + fechaCorta(x.viernes).replace(/ \d{4}$/, "") + '</td><td class="num">' + x.paquetes + '</td><td class="num">' + x.pagados + "</td><td>" +
+      (x.debe ? '<span class="tag rojo">Debemos ' + x.debe + "</span>" : '<span class="tag verde">Pagado</span>') + "</td></tr>").join("") + "</tbody>";
+}
+
+// ---------- Pago a proveedor ----------
+let montoProveedorTocado = false;
+$("#btn-proveedor").addEventListener("click", () => {
+  const f = fabrica();
+  $("#pv-tipo").value = "fabrica";
+  $("#pv-nombre").value = "";
+  $("#pv-paq").value = f.deben || "";
+  $("#pv-fecha").value = hoyISO();
+  $("#pv-desc").value = "";
+  $("#pv-error").textContent = "";
+  montoProveedorTocado = false;
+  formaProveedor();
+  $("#d-proveedor").showModal();
+});
+
+// Muestra los campos según el proveedor y calcula el monto de los paquetes si no lo escribieron a mano
+function formaProveedor() {
+  const esFabrica = $("#pv-tipo").value === "fabrica";
+  $("#pv-nombre-l").hidden = esFabrica;
+  $("#pv-paq-l").hidden = !esFabrica;
+  $("#pv-paq").required = esFabrica;
+  const costo = precios(datos).costoPaquete;
+  const f = fabrica();
+  $("#pv-deuda").textContent = esFabrica
+    ? (f.deben ? "Debemos " + f.deben + " " + plural(f.deben, "paquete", "paquetes") + " (" + plata(f.debePlata) + ")." : "No debemos paquetes a la fábrica.") +
+      " Cada paquete cuesta " + plata(costo) + " (se cambia en Precios y costos)."
+    : "";
+  if (!montoProveedorTocado) {
+    const n = esFabrica ? Number($("#pv-paq").value) || 0 : 0;
+    $("#pv-monto").value = n ? plata(n * costo) : "";
+  }
+}
+$("#pv-tipo").addEventListener("change", formaProveedor);
+$("#pv-paq").addEventListener("input", formaProveedor);
+$("#pv-monto").addEventListener("input", (e) => {
+  montoProveedorTocado = true;
+  const v = leerPlata(e.target.value);
+  e.target.value = v ? plata(v) : "";
+});
+
+$("#f-proveedor").addEventListener("submit", async (e) => {
+  if (e.submitter && e.submitter.value === "cancelar") return;
+  e.preventDefault();
+  const esFabrica = $("#pv-tipo").value === "fabrica";
+  const monto = leerPlata($("#pv-monto").value);
+  const paquetes = esFabrica ? Math.floor(Number($("#pv-paq").value) || 0) : 0;
+  const nombre = esFabrica ? "Fábrica de chorizos" : $("#pv-nombre").value.trim();
+  if (esFabrica && paquetes < 1) { $("#pv-error").textContent = "Escribe cuántos paquetes se pagan."; return; }
+  if (!nombre) { $("#pv-error").textContent = "Escribe el nombre del proveedor."; return; }
+  if (!monto) { $("#pv-error").textContent = "Escribe el monto."; return; }
+  const f = fabrica();
+  if (esFabrica && paquetes > f.deben &&
+    !confirm("Se deben " + f.deben + " " + plural(f.deben, "paquete", "paquetes") + " y vas a pagar " + paquetes + ". ¿Guardar los demás como pagados por adelantado?")) return;
+  const mov = { tipo: "proveedor", proveedor: nombre, monto, fecha: $("#pv-fecha").value, descripcion: $("#pv-desc").value.trim(), creado: new Date().toISOString() };
+  if (esFabrica) mov.paquetes = paquetes;
+  try { await store.agregar("movimientos", mov); $("#d-proveedor").close(); }
+  catch (x) { $("#pv-error").textContent = "No se pudo guardar: " + x.message; }
+});
 
 // ---------- Movimientos ----------
 let tipoMov = null;

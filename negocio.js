@@ -129,6 +129,48 @@ export function saldos(datos) {
   return { neta, fondo, gasolina, saldoFondo: fondo - gasolina, socios, invertidoTotal };
 }
 
+// Lo que debe haber en Nequi: todo lo cobrado a clientes menos todo lo que ha salido (pagos a
+// proveedores, gastos, liquidaciones e inversiones). Supone que toda la plata pasa por Nequi.
+export function saldoNequi(datos) {
+  const sum = (arr, f) => arr.reduce((t, x) => t + (Number(f(x)) || 0), 0);
+  const movs = (tipo) => datos.movimientos.filter((m) => m.tipo === tipo);
+  const cobrado = sum(datos.pedidos.filter((p) => p.pagado), (p) => p.total);
+  const proveedores = sum(movs("proveedor"), (m) => m.monto);
+  const gastos = sum(movs("gasto"), (m) => m.monto);
+  const liquidado = sum(movs("liquidacion"), (m) => m.monto);
+  const invertido = sum(movs("inversion"), (m) => m.monto);
+  return { cobrado, proveedores, gastos, liquidado, invertido, saldo: cobrado - proveedores - gastos - liquidado - invertido };
+}
+
+// Cuenta con la fábrica de chorizos. Pedidos a la fábrica = los paquetes de los pedidos que se
+// producen (`pedidos` ya viene filtrado a los confirmados) con entrega hasta el viernes `hasta`.
+// Pagados = los paquetes de los pagos a proveedor que llevan paquetes. Lo pagado se reparte del
+// viernes más viejo al más nuevo para saber qué viernes ya están pagos.
+export function cuentaFabrica(pedidos, movimientos, hasta, costoPaquete) {
+  const porViernes = new Map();
+  pedidos.forEach((p) => {
+    const n = Number(p.paquetes) || 0;
+    if (!p.fechaEntrega || p.fechaEntrega > hasta || !n) return;
+    porViernes.set(p.fechaEntrega, (porViernes.get(p.fechaEntrega) || 0) + n);
+  });
+  const pagos = movimientos.filter((m) => m.tipo === "proveedor" && Number(m.paquetes) > 0);
+  const pagados = pagos.reduce((t, m) => t + Number(m.paquetes), 0);
+  const pagadoPlata = pagos.reduce((t, m) => t + (Number(m.monto) || 0), 0);
+  let resto = pagados;
+  const viernes = [...porViernes.keys()].sort().map((v) => {
+    const paquetes = porViernes.get(v);
+    const cubiertos = Math.min(paquetes, resto);
+    resto -= cubiertos;
+    return { viernes: v, paquetes, pagados: cubiertos, debe: paquetes - cubiertos };
+  });
+  const pedidosFabrica = viernes.reduce((t, x) => t + x.paquetes, 0);
+  const deben = Math.max(0, pedidosFabrica - pagados);
+  return {
+    pedidos: pedidosFabrica, pagados, deben, debePlata: deben * (Number(costoPaquete) || 0),
+    adelantados: Math.max(0, pagados - pedidosFabrica), pagadoPlata, viernes
+  };
+}
+
 // Enlaces de mapas para un punto
 export function enlaceGoogle(c) { return "https://www.google.com/maps/search/?api=1&query=" + c.lat + "," + c.lng; }
 export function enlaceApple(c) { return "https://maps.apple.com/?ll=" + c.lat + "," + c.lng + "&q=" + encodeURIComponent(c.nombre || "Entrega"); }

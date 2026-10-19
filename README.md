@@ -3,7 +3,7 @@
 App web (un solo HTML, sin instalar nada) para Daniel y Mariana, en `/admin/`, con cuatro tableros:
 
 1. **Entregas**: pedidos del viernes, mapa con pines (verde = pagado, rojo = pendiente), botón **Crear pedido**, enlaces a Google Maps y Mapas de iPhone por cliente y ruta completa en Google Maps. El botón **Actualizar puntos** numera las paradas desde la más al norte (la producción sale de Girardota) y de ahí siempre a la más cercana; ese orden queda guardado en cada pedido, así Daniel y Mariana ven los mismos números y no cambian al marcar entregas. Los pedidos nuevos o con el pin movido quedan al final hasta que se vuelva a tocar el botón.
-2. **Contabilidad**: por mes, ventas cobradas, costo de producto, ganancia bruta, domicilios al fondo de gasolina, otros gastos y ganancia neta; reparto 50/50, liquidaciones totales o parciales, inversiones, tanqueadas e historial. Incluye el editor de precios y costos.
+2. **Contabilidad**: por mes, ventas cobradas, costo de producto, ganancia bruta, domicilios al fondo de gasolina, otros gastos y ganancia neta; reparto 50/50, liquidaciones totales o parciales, inversiones, tanqueadas e historial. Muestra cuánta plata debe haber en Nequi y la cuenta con la fábrica (paquetes pedidos, pagados y debidos), con un botón para registrar pagos a proveedores. Incluye el editor de precios y costos.
 3. **Clientes**: tabla editable (teléfono, dirección, pin), con cuántas veces y cada cuánto compra cada cliente.
 4. **Producción** (inventario): en tiempo real, cuántos paquetes de chorizos y cuántos litros de guaro hay que tener para la próxima entrega. Cuenta todos los pedidos de ese viernes, pagados o no; en la próxima entrega suma también los pedidos de viernes anteriores que no se han entregado. Muestra lo entregado y lo que falta, el detalle por producto y los próximos viernes.
 
@@ -60,6 +60,9 @@ El script lee Firestore con los permisos de esa cuenta (no pasa por `firestore.r
 - Ganancia bruta = ventas − costo de producto. Ganancia neta = bruta − fondo de gasolina − otros gastos. Se reparte 50% Daniel y 50% Mariana.
 - Las tanqueadas se registran como gasto "Gasolina" y salen del fondo, no de la ganancia.
 - Liquidar e invertir descuentan del disponible de cada socio (una inversión de "ambos" descuenta 50 y 50).
+- Debe haber en Nequi = todo lo cobrado − pagos a proveedores − gastos (gasolina y otros) − liquidaciones − inversiones, desde el primer pedido. Supone que toda la plata entra y sale por Nequi.
+- Pagos a proveedores: salen de Nequi pero no cambian la ganancia, porque el costo de los chorizos ya se resta en cada pedido pagado. Un pago a la fábrica lleva cuántos paquetes paga; el monto se calcula con el costo por paquete y se puede cambiar a mano.
+- Paquetes pedidos a la fábrica = los paquetes que cuenta Producción (pedidos a mano y pedidos de la app con pago aprobado) con viernes de entrega ya cerrado: el viernes de esta semana entra desde el corte del jueves a las 12 m. Lo pagado cubre primero los viernes más viejos.
 - Viernes de entrega: el próximo viernes después de la fecha del pedido (un pedido hecho un viernes va al siguiente). Se puede cambiar a mano.
 
 ## Puesta en marcha
