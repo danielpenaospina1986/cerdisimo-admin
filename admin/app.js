@@ -982,6 +982,7 @@ function abrirMov(tipo, cat) {
   $("#m-todo-caja").hidden = tipo === "gasto";
   $("#m-todo").hidden = tipo !== "liquidacion";
   $("#m-monto").value = ""; $("#m-desc").value = ""; $("#m-fecha").value = hoyISO(); $("#m-error").textContent = "";
+  $("#m-guardar").disabled = false;
   $("#m-ayuda").textContent = {
     gasto: "La gasolina sale del fondo de gasolina. Los demás gastos se restan de la ganancia neta del mes.",
     liquidacion: "Plata que el socio saca del negocio. Se descuenta de su disponible.",
@@ -1014,8 +1015,12 @@ $("#f-mov").addEventListener("submit", async (e) => {
     const x = saldos(datos).socios[mov.socio];
     if (monto > x.disponible + 0.5 && !confirm(mov.socio + " tiene disponible " + plata(x.disponible) + ". ¿Liquidar " + plata(monto) + " de todos modos?")) return;
   }
+  // Un solo movimiento por toque: mientras se guarda, el botón no vuelve a guardar
+  if ($("#m-guardar").disabled) return;
+  $("#m-guardar").disabled = true;
   try { await store.agregar("movimientos", mov); $("#d-mov").close(); }
   catch (x) { $("#m-error").textContent = "No se pudo guardar: " + x.message; }
+  finally { $("#m-guardar").disabled = false; }
 });
 
 // ---------- Precios y costos ----------
