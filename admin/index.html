@@ -73,7 +73,7 @@
         <input type="month" id="c-mes" class="campo campo-mes" aria-label="Mes">
       </div>
 
-      <div class="grid2">
+      <div class="grid2 arriba">
         <div class="tarjeta destacada">
           <h2 class="subtitulo">Debe haber en Nequi</h2>
           <p class="cifra" id="c-nequi">$0</p>
@@ -261,33 +261,33 @@
     </form>
   </dialog>
 
-  <!-- Pago a proveedor: la fábrica de chorizos (por paquetes) u otro -->
+  <!-- Pago a proveedor: la fábrica (por paquetes) o la licorera. Su costo ya se resta en cada pedido pagado. -->
   <dialog id="d-proveedor" class="dialogo">
     <form method="dialog" id="f-proveedor" class="form">
       <h2 class="dialogo-t">Pago a proveedor</h2>
       <label class="etq">Proveedor
         <select class="campo" id="pv-tipo">
           <option value="fabrica">Fábrica de chorizos</option>
-          <option value="otro">Otro proveedor</option>
+          <option value="licorera">Licorera (aguardiente)</option>
+          <option value="otro">Otro (empaques, insumos…)</option>
         </select>
       </label>
-      <label class="etq" id="pv-nombre-l" hidden>Nombre del proveedor
-        <input class="campo" id="pv-nombre" placeholder="Por ejemplo, la licorera o los empaques">
-      </label>
-      <label class="etq" id="pv-paq-l">Paquetes que se pagan
-        <input class="campo" id="pv-paq" type="number" min="1" step="1" inputmode="numeric">
-      </label>
       <p class="nota" id="pv-deuda"></p>
-      <label class="etq">Monto
-        <input class="campo" id="pv-monto" inputmode="numeric" required placeholder="$0">
-      </label>
-      <label class="etq">Fecha <input class="campo" id="pv-fecha" type="date" required></label>
-      <label class="etq">Descripción <input class="campo" id="pv-desc" placeholder="Opcional"></label>
-      <p class="nota">Sale de Nequi. No cambia la ganancia del mes: el costo de los chorizos ya se resta en cada pedido pagado.</p>
+      <div class="form" id="pv-campos">
+        <label class="etq" id="pv-paq-l">Paquetes que se pagan
+          <input class="campo" id="pv-paq" type="number" min="1" step="1" inputmode="numeric">
+        </label>
+        <label class="etq">Monto
+          <input class="campo" id="pv-monto" inputmode="numeric" required placeholder="$0">
+        </label>
+        <label class="etq">Fecha <input class="campo" id="pv-fecha" type="date" required></label>
+        <label class="etq">Descripción <input class="campo" id="pv-desc" placeholder="Opcional"></label>
+        <p class="nota" id="pv-nota"></p>
+      </div>
       <p class="error" id="pv-error"></p>
       <div class="botonera">
         <button class="btn btn-sec" value="cancelar" formnovalidate>Cancelar</button>
-        <button class="btn" value="guardar">Guardar</button>
+        <button class="btn" value="guardar" id="pv-guardar">Guardar</button>
       </div>
     </form>
   </dialog>

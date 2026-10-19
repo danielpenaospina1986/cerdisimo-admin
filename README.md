@@ -61,7 +61,7 @@ El script lee Firestore con los permisos de esa cuenta (no pasa por `firestore.r
 - Las tanqueadas se registran como gasto "Gasolina" y salen del fondo, no de la ganancia.
 - Liquidar e invertir descuentan del disponible de cada socio (una inversión de "ambos" descuenta 50 y 50).
 - Debe haber en Nequi = todo lo cobrado − pagos a proveedores − gastos (gasolina y otros) − liquidaciones − inversiones, desde el primer pedido. Supone que toda la plata entra y sale por Nequi.
-- Pagos a proveedores: salen de Nequi pero no cambian la ganancia, porque el costo de los chorizos ya se resta en cada pedido pagado. Un pago a la fábrica lleva cuántos paquetes paga; el monto se calcula con el costo por paquete y se puede cambiar a mano.
+- Pagos a proveedores (la fábrica y la licorera): salen de Nequi pero no cambian la ganancia, porque el costo de los chorizos y del aguardiente ya se resta en cada pedido pagado. Un pago a la fábrica lleva cuántos paquetes paga; el monto se calcula con el costo por paquete y se puede cambiar a mano. Empaques, insumos y demás compras no están en ese costo: van como gasto y sí se restan de la ganancia.
 - Paquetes pedidos a la fábrica = los paquetes que cuenta Producción (pedidos a mano y pedidos de la app con pago aprobado) con viernes de entrega ya cerrado: el viernes de esta semana entra desde el corte del jueves a las 12 m. Lo pagado cubre primero los viernes más viejos.
 - Viernes de entrega: el próximo viernes después de la fecha del pedido (un pedido hecho un viernes va al siguiente). Se puede cambiar a mano.
 

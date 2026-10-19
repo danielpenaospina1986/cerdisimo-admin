@@ -887,12 +887,18 @@ function pintarNequiYFabrica(s) {
 }
 
 // ---------- Pago a proveedor ----------
+// Solo la fábrica y la licorera: lo que se les paga ya se resta de la ganancia con el costo por paquete
+// y por litro de cada pedido pagado. Lo demás (empaques, insumos) se resta aparte, como gasto.
+const PROVEEDORES = {
+  fabrica: { nombre: "Fábrica de chorizos", nota: "el costo de los chorizos ya se resta en cada pedido pagado." },
+  licorera: { nombre: "Licorera", nota: "el costo del aguardiente ya se resta en cada pedido pagado." },
+};
 let montoProveedorTocado = false;
 $("#btn-proveedor").addEventListener("click", () => {
   const f = fabrica();
   $("#pv-tipo").value = "fabrica";
-  $("#pv-nombre").value = "";
   $("#pv-paq").value = f.deben || "";
+  $("#pv-monto").value = "";
   $("#pv-fecha").value = hoyISO();
   $("#pv-desc").value = "";
   $("#pv-error").textContent = "";
@@ -903,19 +909,28 @@ $("#btn-proveedor").addEventListener("click", () => {
 
 // Muestra los campos según el proveedor y calcula el monto de los paquetes si no lo escribieron a mano
 function formaProveedor() {
-  const esFabrica = $("#pv-tipo").value === "fabrica";
-  $("#pv-nombre-l").hidden = esFabrica;
+  const tipo = $("#pv-tipo").value;
+  const esFabrica = tipo === "fabrica";
+  const prov = PROVEEDORES[tipo];
+  $("#pv-error").textContent = "";
+  // Un campo escondido no debe frenar el Guardar: deshabilitado, el navegador no lo valida
+  $("#pv-campos").hidden = !prov;
+  ["#pv-paq", "#pv-monto", "#pv-fecha", "#pv-desc"].forEach((sel) => { $(sel).disabled = !prov; });
   $("#pv-paq-l").hidden = !esFabrica;
+  $("#pv-paq").disabled = !esFabrica;
   $("#pv-paq").required = esFabrica;
+  $("#pv-guardar").textContent = prov ? "Guardar" : "Registrar como gasto";
   const costo = precios(datos).costoPaquete;
   const f = fabrica();
   $("#pv-deuda").textContent = esFabrica
     ? (f.deben ? "Debemos " + f.deben + " " + plural(f.deben, "paquete", "paquetes") + " (" + plata(f.debePlata) + ")." : "No debemos paquetes a la fábrica.") +
       " Cada paquete cuesta " + plata(costo) + " (se cambia en Precios y costos)."
-    : "";
+    : prov ? ""
+    : "Los empaques, insumos y demás compras no están en el costo por paquete ni por litro, así que se restan de la ganancia del mes: se registran como gasto.";
+  $("#pv-nota").textContent = prov ? "Sale de Nequi. No cambia la ganancia del mes: " + prov.nota : "";
   if (!montoProveedorTocado) {
     const n = esFabrica ? Number($("#pv-paq").value) || 0 : 0;
-    $("#pv-monto").value = n ? plata(n * costo) : "";
+    $("#pv-monto").value = n > 0 ? plata(n * costo) : "";
   }
 }
 $("#pv-tipo").addEventListener("change", formaProveedor);
@@ -929,17 +944,18 @@ $("#pv-monto").addEventListener("input", (e) => {
 $("#f-proveedor").addEventListener("submit", async (e) => {
   if (e.submitter && e.submitter.value === "cancelar") return;
   e.preventDefault();
-  const esFabrica = $("#pv-tipo").value === "fabrica";
+  const tipo = $("#pv-tipo").value;
+  const prov = PROVEEDORES[tipo];
+  if (!prov) { $("#d-proveedor").close(); abrirMov("gasto", "Insumos"); return; }
+  const esFabrica = tipo === "fabrica";
   const monto = leerPlata($("#pv-monto").value);
-  const paquetes = esFabrica ? Math.floor(Number($("#pv-paq").value) || 0) : 0;
-  const nombre = esFabrica ? "Fábrica de chorizos" : $("#pv-nombre").value.trim();
-  if (esFabrica && paquetes < 1) { $("#pv-error").textContent = "Escribe cuántos paquetes se pagan."; return; }
-  if (!nombre) { $("#pv-error").textContent = "Escribe el nombre del proveedor."; return; }
+  const paquetes = esFabrica ? Number($("#pv-paq").value) : 0;
+  if (esFabrica && !(Number.isInteger(paquetes) && paquetes >= 1)) { $("#pv-error").textContent = "Escribe cuántos paquetes se pagan."; return; }
   if (!monto) { $("#pv-error").textContent = "Escribe el monto."; return; }
   const f = fabrica();
   if (esFabrica && paquetes > f.deben &&
     !confirm("Se deben " + f.deben + " " + plural(f.deben, "paquete", "paquetes") + " y vas a pagar " + paquetes + ". ¿Guardar los demás como pagados por adelantado?")) return;
-  const mov = { tipo: "proveedor", proveedor: nombre, monto, fecha: $("#pv-fecha").value, descripcion: $("#pv-desc").value.trim(), creado: new Date().toISOString() };
+  const mov = { tipo: "proveedor", proveedor: prov.nombre, monto, fecha: $("#pv-fecha").value, descripcion: $("#pv-desc").value.trim(), creado: new Date().toISOString() };
   if (esFabrica) mov.paquetes = paquetes;
   try { await store.agregar("movimientos", mov); $("#d-proveedor").close(); }
   catch (x) { $("#pv-error").textContent = "No se pudo guardar: " + x.message; }
