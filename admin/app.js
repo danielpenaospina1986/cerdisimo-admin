@@ -297,7 +297,11 @@ document.addEventListener("click", async (e) => {
     const que = m ? [NOMBRE_MOV[m.tipo], ...detalleMov(m), plata(m.monto), fechaCorta(m.fecha)].filter(Boolean).join(" · ") : "este movimiento";
     if (confirm("¿Borrar " + que + "? No se puede deshacer.")) await store.borrar("movimientos", id);
   }
-  if (b.dataset.acc === "editar-prov") { const m = datos.movimientos.find((x) => x.id === id); if (m) abrirProveedor(m); }
+  if (b.dataset.acc === "editar-mov") {
+    const m = datos.movimientos.find((x) => x.id === id);
+    if (m && (m.tipo === "proveedor" || m.paquetes)) abrirProveedor(m);
+    else if (m && NOMBRE_MOV[m.tipo]) abrirMov(m.tipo, m.categoria, m);
+  }
   if (b.dataset.acc === "borrar-pedido" && p && confirm("¿Borrar el pedido de " + p.clienteNombre + "?")) await store.borrar("pedidos", id);
 });
 
@@ -808,9 +812,9 @@ function detalleMov(m) {
   return [m.socio || (m.tipo === "inversion" ? "Ambos socios" : ""), m.descripcion];
 }
 
-// Editar (solo pagos a proveedor) y borrar, para las filas de movimientos
+// Editar y borrar, para las filas de movimientos
 function botonesMov(m) {
-  return (m.tipo === "proveedor" || m.paquetes ? '<button class="x lapiz" data-acc="editar-prov" data-id="' + esc(m.id) + '" aria-label="Editar">✎</button>' : "") +
+  return '<button class="x lapiz" data-acc="editar-mov" data-id="' + esc(m.id) + '" aria-label="Editar">✎</button>' +
     '<button class="x" data-acc="borrar-mov" data-id="' + esc(m.id) + '" aria-label="Borrar">✕</button>';
 }
 
@@ -838,6 +842,14 @@ function pintarContabilidad() {
     fila("Gastado en gasolina este mes", "−" + plata(r.gasolinaGastada), "menos") +
     fila("Saldo total del fondo", plata(s.saldoFondo), "suma");
   $("#c-invertido").textContent = plata(s.invertidoTotal);
+  // Todas las inversiones (de todo el tiempo), la más reciente primero, para corregirlas o borrarlas
+  const invs = datos.movimientos.filter((m) => m.tipo === "inversion")
+    .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "") || (b.creado || "").localeCompare(a.creado || ""));
+  $("#c-inv-caja").hidden = !invs.length;
+  $("#c-inv-resumen").textContent = "Inversiones registradas (" + invs.length + ")";
+  $("#c-inversiones").innerHTML = "<thead><tr><th>Fecha</th><th>Socio</th><th class=num>Monto</th><th></th></tr></thead><tbody>" +
+    invs.map((m) => "<tr><td>" + fechaCorta(m.fecha) + (m.descripcion ? '<br><span class="nota">' + esc(m.descripcion) + "</span>" : "") +
+      "</td><td>" + esc(m.socio || "Ambos") + '</td><td class="num">' + plata(m.monto) + '</td><td class="acciones">' + botonesMov(m) + "</td></tr>").join("") + "</tbody>";
 
   $("#c-socios").innerHTML = SOCIOS.map((n) => {
     const x = s.socios[n];
@@ -1006,19 +1018,29 @@ $("#f-proveedor").addEventListener("submit", async (e) => {
 
 // ---------- Movimientos ----------
 let tipoMov = null;
+let movEditado = null; // el gasto, liquidación o inversión que se está corrigiendo, o null si es nuevo
 document.querySelectorAll("[data-mov]").forEach((b) => b.addEventListener("click", () => abrirMov(b.dataset.mov, b.dataset.cat)));
 
-function abrirMov(tipo, cat) {
+// Abre el diálogo para un movimiento nuevo, o para corregir `mov` si se pasa
+function abrirMov(tipo, cat, mov) {
   tipoMov = tipo;
-  const titulos = { gasto: "Registrar gasto", liquidacion: "Liquidar ganancias", inversion: "Invertir en el negocio" };
-  $("#d-mov-t").textContent = cat === "Gasolina" ? "Registrar tanqueada" : titulos[tipo];
+  movEditado = mov || null;
+  const gasolina = (mov ? mov.categoria : cat) === "Gasolina";
+  const titulos = mov
+    ? { gasto: gasolina ? "Editar tanqueada" : "Editar gasto", liquidacion: "Editar liquidación", inversion: "Editar inversión" }
+    : { gasto: gasolina ? "Registrar tanqueada" : "Registrar gasto", liquidacion: "Liquidar ganancias", inversion: "Invertir en el negocio" };
+  $("#d-mov-t").textContent = titulos[tipo];
   $("#m-socio").innerHTML = (tipo === "inversion" ? '<option value="">Ambos (50% y 50%)</option>' : "") + SOCIOS.map((s) => "<option>" + s + "</option>").join("");
+  if (mov && tipo !== "gasto") elegir($("#m-socio"), mov.socio || "");
   $("#m-socio-l").hidden = tipo === "gasto";
   $("#m-cat-l").hidden = tipo !== "gasto";
-  $("#m-cat").value = cat || "Insumos";
+  elegir($("#m-cat"), (mov ? mov.categoria : cat) || "Insumos");
   $("#m-todo-caja").hidden = tipo === "gasto";
   $("#m-todo").hidden = tipo !== "liquidacion";
-  $("#m-monto").value = ""; $("#m-desc").value = ""; $("#m-fecha").value = hoyISO(); $("#m-error").textContent = "";
+  $("#m-monto").value = mov ? plata(Number(mov.monto) || 0) : "";
+  $("#m-desc").value = mov ? mov.descripcion || "" : "";
+  $("#m-fecha").value = mov ? mov.fecha || hoyISO() : hoyISO();
+  $("#m-error").textContent = "";
   $("#m-guardar").disabled = false;
   $("#m-ayuda").textContent = {
     gasto: "La gasolina sale del fondo de gasolina. Los demás gastos se restan de la ganancia neta del mes.",
@@ -1028,15 +1050,28 @@ function abrirMov(tipo, cat) {
   mostrarDisponible();
   $("#d-mov").showModal();
 }
+// Elige `valor` en la lista; si es un dato viejo que la lista no trae, lo agrega para no perderlo al guardar
+function elegir(sel, valor) {
+  if (![...sel.options].some((o) => o.value === valor)) sel.add(new Option(valor, valor));
+  sel.value = valor;
+}
+// Disponible del socio elegido. Al corregir, sin contar lo que ya restaba este mismo movimiento.
+function disponibleDe(socio) {
+  const x = saldos(datos).socios[socio];
+  if (!x) return null;
+  const m = movEditado;
+  if (!m || m.tipo === "gasto") return x.disponible;
+  const propio = m.socio === socio ? Number(m.monto) || 0 : m.tipo === "inversion" && !m.socio ? (Number(m.monto) || 0) / 2 : 0;
+  return x.disponible + propio;
+}
 function mostrarDisponible() {
-  const s = saldos(datos);
-  const x = s.socios[$("#m-socio").value];
-  $("#m-disp").textContent = x ? "Disponible: " + plata(x.disponible) : "";
+  const d = disponibleDe($("#m-socio").value);
+  $("#m-disp").textContent = d === null ? "" : "Disponible: " + plata(d);
 }
 $("#m-socio").onchange = mostrarDisponible;
 $("#m-todo").onclick = () => {
-  const x = saldos(datos).socios[$("#m-socio").value];
-  if (x) $("#m-monto").value = plata(Math.max(0, x.disponible));
+  const d = disponibleDe($("#m-socio").value);
+  if (d !== null) $("#m-monto").value = plata(Math.max(0, d));
 };
 $("#m-monto").addEventListener("input", (e) => { const v = leerPlata(e.target.value); e.target.value = v ? plata(v) : ""; });
 
@@ -1045,17 +1080,21 @@ $("#f-mov").addEventListener("submit", async (e) => {
   e.preventDefault();
   const monto = leerPlata($("#m-monto").value);
   if (!monto) { $("#m-error").textContent = "Escribe el monto."; return; }
-  const mov = { tipo: tipoMov, monto, fecha: $("#m-fecha").value, descripcion: $("#m-desc").value.trim(), creado: new Date().toISOString() };
+  const mov = { tipo: tipoMov, monto, fecha: $("#m-fecha").value, descripcion: $("#m-desc").value.trim() };
   if (tipoMov === "gasto") mov.categoria = $("#m-cat").value;
   else mov.socio = $("#m-socio").value;
   if (tipoMov === "liquidacion") {
-    const x = saldos(datos).socios[mov.socio];
-    if (monto > x.disponible + 0.5 && !confirm(mov.socio + " tiene disponible " + plata(x.disponible) + ". ¿Liquidar " + plata(monto) + " de todos modos?")) return;
+    const d = disponibleDe(mov.socio);
+    if (monto > d + 0.5 && !confirm(mov.socio + " tiene disponible " + plata(d) + ". ¿Liquidar " + plata(monto) + " de todos modos?")) return;
   }
   // Un solo movimiento por toque: mientras se guarda, el botón no vuelve a guardar
   if ($("#m-guardar").disabled) return;
   $("#m-guardar").disabled = true;
-  try { await store.agregar("movimientos", mov); $("#d-mov").close(); }
+  try {
+    if (movEditado) await store.actualizar("movimientos", movEditado.id, { ...mov, editado: new Date().toISOString() });
+    else await store.agregar("movimientos", { ...mov, creado: new Date().toISOString() });
+    $("#d-mov").close();
+  }
   catch (x) { $("#m-error").textContent = "No se pudo guardar: " + x.message; }
   finally { $("#m-guardar").disabled = false; }
 });
