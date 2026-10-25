@@ -820,7 +820,7 @@ const NOMBRE_MOV = { gasto: "Gasto", liquidacion: "Liquidación", inversion: "In
 function detalleMov(m) {
   if (m.tipo === "gasto") return [m.categoria, m.descripcion];
   if (m.tipo === "proveedor") return [m.proveedor, m.paquetes ? m.paquetes + " " + plural(Number(m.paquetes), "paquete", "paquetes") : "", m.descripcion];
-  return [m.socio || (m.tipo === "inversion" ? "Ambos socios" : ""), m.descripcion];
+  return [m.socio || (m.tipo === "inversion" ? "Ambos socios" : ""), esDelEvento(m) ? "Dogstar" : "", m.descripcion];
 }
 
 // Editar y borrar, para las filas de movimientos
@@ -854,13 +854,17 @@ function pintarContabilidad() {
     fila("Saldo total del fondo", plata(s.saldoFondo), "suma");
   $("#c-invertido").textContent = plata(s.invertidoTotal);
   // Todas las inversiones (de todo el tiempo), la más reciente primero, para corregirlas o borrarlas
-  const invs = datos.movimientos.filter((m) => m.tipo === "inversion")
+  const todasInv = datos.movimientos.filter((m) => m.tipo === "inversion");
+  const delEvento = todasInv.filter(esDelEvento).reduce((t, m) => t + (Number(m.monto) || 0), 0);
+  $("#c-inv-evento").textContent = delEvento ? "De eso, " + plata(delEvento) + " son compras de la chorizada en Dogstar." : "";
+  const filtro = $("#c-inv-filtro").value;
+  const invs = todasInv.filter((m) => filtro === "todas" || (filtro === "evento") === esDelEvento(m))
     .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "") || (b.creado || "").localeCompare(a.creado || ""));
-  $("#c-inv-caja").hidden = !invs.length;
+  $("#c-inv-caja").hidden = !todasInv.length;
   $("#c-inv-resumen").textContent = "Inversiones registradas (" + invs.length + ")";
   // Fecha, socio y nota en una sola celda, para que ✎ y ✕ quepan con la tarjeta a media pantalla o en un celular angosto
   $("#c-inversiones").innerHTML = "<thead><tr><th>Inversión</th><th class=num>Monto</th><th></th></tr></thead><tbody>" +
-    invs.map((m) => "<tr><td>" + fechaCorta(m.fecha) + '<br><span class="nota">' + esc(m.socio || "Ambos socios") + (m.descripcion ? " · " + esc(m.descripcion) : "") +
+    invs.map((m) => "<tr><td>" + fechaCorta(m.fecha) + '<br><span class="nota">' + esc(m.socio || "Ambos socios") + (esDelEvento(m) ? ' · <span class="tag">Dogstar</span>' : "") + (m.descripcion ? " · " + esc(m.descripcion) : "") +
       '</span></td><td class="num">' + plata(m.monto) + '</td><td class="acciones">' + botonesMov(m) + "</td></tr>").join("") + "</tbody>";
 
   $("#c-socios").innerHTML = SOCIOS.map((n) => {
@@ -1035,7 +1039,7 @@ let movEditado = null; // el gasto, liquidación o inversión que se está corri
 document.querySelectorAll("[data-mov]").forEach((b) => b.addEventListener("click", () => abrirMov(b.dataset.mov, b.dataset.cat)));
 
 // Abre el diálogo para un movimiento nuevo, o para corregir `mov` si se pasa
-function abrirMov(tipo, cat, mov) {
+function abrirMov(tipo, cat, mov, delEvento) {
   tipoMov = tipo;
   movEditado = mov || null;
   const gasolina = (mov ? mov.categoria : cat) === "Gasolina";
@@ -1053,6 +1057,9 @@ function abrirMov(tipo, cat, mov) {
   $("#m-monto").value = mov ? plata(Number(mov.monto) || 0) : "";
   $("#m-desc").value = mov ? mov.descripcion || "" : "";
   $("#m-fecha").value = mov ? mov.fecha || hoyISO() : hoyISO();
+  // Las inversiones se pueden marcar como compras de la chorizada para sacar la ganancia del evento aparte
+  $("#m-evento-l").hidden = tipo !== "inversion";
+  $("#m-evento").checked = mov ? esDelEvento(mov) : !!delEvento;
   $("#m-error").textContent = "";
   $("#m-guardar").disabled = false;
   $("#m-ayuda").textContent = {
@@ -1096,6 +1103,7 @@ $("#f-mov").addEventListener("submit", async (e) => {
   const mov = { tipo: tipoMov, monto, fecha: $("#m-fecha").value, descripcion: $("#m-desc").value.trim() };
   if (tipoMov === "gasto") mov.categoria = $("#m-cat").value;
   else mov.socio = $("#m-socio").value;
+  if (tipoMov === "inversion") mov.evento = $("#m-evento").checked ? EVENTO.id : null;
   if (tipoMov === "liquidacion") {
     const d = disponibleDe(mov.socio);
     if (monto > d + 0.5 && !confirm(mov.socio + " tiene disponible " + plata(d) + ". ¿Liquidar " + plata(monto) + " de todos modos?")) return;
@@ -1296,14 +1304,25 @@ function pintarEvento() {
       '</td><td class="num">' + cantidadReceta(x, r.preventaPagada) + '</td><td class="num">' + cantidadReceta(x, n) + "</td></tr>").join("") + "</tbody>";
 
   const fila = (a, b, cls) => "<tr" + (cls ? ' class="' + cls + '"' : "") + "><td>" + a + '</td><td class="num">' + b + "</td></tr>";
+  const compras = datos.movimientos.filter((m) => m.tipo === "inversion" && esDelEvento(m))
+    .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "") || (b.creado || "").localeCompare(a.creado || ""));
+  const invertido = compras.reduce((t, m) => t + (Number(m.monto) || 0), 0);
   $("#ev-cuentas").innerHTML = "<tbody>" +
     fila("Ventas cobradas (preventa y carpa)", plata(r.ventas)) +
     fila("De eso, en efectivo (no entra a Nequi)", plata(r.efectivo)) +
-    fila("Costo de lo vendido (chorizo " + plata(p.costoPaquete / 5) + " + pan y salsas " + plata(p.costoChoripan) + " por choripán)", plata(r.costo)) +
-    fila("Ganancia del evento", plata(r.ganancia), "suma") + "</tbody>";
+    fila("Compras del evento (inversiones marcadas Dogstar)", "−" + plata(invertido)) +
+    fila("Ganancia del evento", plata(r.ventas - invertido), "suma") +
+    fila("Costo estimado de lo vendido (chorizo " + plata(p.costoPaquete / 5) + " + pan y salsas " + plata(p.costoChoripan) + " por choripán)", plata(r.costo)) + "</tbody>";
+  $("#ev-compras").innerHTML = compras.length
+    ? "<thead><tr><th>Compra</th><th class=num>Monto</th><th></th></tr></thead><tbody>" +
+      compras.map((m) => "<tr><td>" + fechaCorta(m.fecha) + '<br><span class="nota">' + esc(m.descripcion || "Sin descripción") + " · " + esc(m.socio || "Ambos socios") +
+        '</span></td><td class="num">' + plata(m.monto) + '</td><td class="acciones">' + botonesMov(m) + "</td></tr>").join("") + "</tbody>"
+    : '<tbody><tr class="vacia"><td>Todavía no hay compras del evento.</td></tr></tbody>';
 }
 
 $("#ev-buscar").addEventListener("input", pintarEvento);
+$("#c-inv-filtro").onchange = () => pintarContabilidad();
+$("#ev-compra").onclick = () => abrirMov("inversion", null, null, true);
 
 // Entregar choripanes de una preventa, uno por uno o todos los que falten
 document.addEventListener("click", async (e) => {
