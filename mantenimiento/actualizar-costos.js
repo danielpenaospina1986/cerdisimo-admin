@@ -3,7 +3,7 @@
 // No cambia precios, domicilios, totales, pagos ni entregas. Los pedidos nuevos ya guardan
 // el costo vigente al crearse, así que esto solo hace falta cuando se quiere corregir el pasado.
 import { crearStore, modoPrueba } from "../store.js";
-import { precios, plata, fechaCorta, saldos, SOCIOS } from "../negocio.js";
+import { precios, plata, fechaCorta, saldos, SOCIOS, CHORIZOS_POR_PAQUETE } from "../negocio.js";
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -29,7 +29,9 @@ function pedirLogin(entrar) {
 export function calcularCambios(d) {
   const p = precios(d);
   return d.pedidos.map((x) => {
-    const costo = num(x.paquetes) * p.costoPaquete + num(x.litros) * p.costoLitro;
+    // Los choripanes de Dogstar llevan un chorizo suelto más pan y salsas
+    const costo = Math.round(num(x.paquetes) * p.costoPaquete + num(x.litros) * p.costoLitro +
+      num(x.choripanes) * (p.costoPaquete / CHORIZOS_POR_PAQUETE + num(p.costoChoripan)));
     const ganancia = num(x.total) - costo - num(x.envio);
     return { pedido: x, costoAntes: num(x.costoProducto), costo, gananciaAntes: num(x.ganancia), ganancia };
   }).filter((c) => c.costo !== num(c.pedido.costoProducto) || c.ganancia !== num(c.pedido.ganancia))

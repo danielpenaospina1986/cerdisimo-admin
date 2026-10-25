@@ -29,6 +29,7 @@
       <button role="tab" data-vista="contabilidad" aria-selected="false">Contabilidad</button>
       <button role="tab" data-vista="clientes" aria-selected="false">Clientes</button>
       <button role="tab" data-vista="produccion" aria-selected="false">Producción</button>
+      <button role="tab" data-vista="evento" aria-selected="false">Dogstar</button>
     </nav>
   </header>
 
@@ -189,6 +190,53 @@
       <h2 class="seccion">Próximas entregas</h2>
       <div class="tabla-caja"><table class="tabla tabla-clientes" id="pr-proximas"></table></div>
       <p class="nota">Las cifras se actualizan solas cada vez que alguien crea, cambia o entrega un pedido. Cuentan los pedidos creados aquí (pagados o no) y los de la app de clientes con el pago aprobado.</p>
+    </section>
+
+    <!-- ===== 5. Chorizada en Dogstar (aparte de los pedidos normales) ===== -->
+    <section class="vista" id="vista-evento" hidden>
+      <div class="barra">
+        <div class="barra-t">
+          <p class="eyebrow" id="ev-fecha">Evento</p>
+          <h1 class="titulo">Chorizada en Dogstar</h1>
+        </div>
+      </div>
+      <div class="chips" id="ev-resumen"></div>
+
+      <h2 class="seccion">Preventas: quién reclama</h2>
+      <input class="campo" id="ev-buscar" type="search" placeholder="Buscar por nombre o código (CC-…)" autocomplete="off">
+      <div class="lista" id="ev-lista"></div>
+
+      <h2 class="seccion">Ventas en la carpa</h2>
+      <form class="tarjeta form" id="f-carpa">
+        <div class="prod" id="carpa-prod">
+          <div class="prod-n" id="carpa-precio">Choripán en el sitio<small></small></div>
+          <div class="stepper">
+            <button type="button" data-paso-carpa="-1" aria-label="Quitar un choripán">−</button>
+            <output id="carpa-n">1</output>
+            <button type="button" data-paso-carpa="1" aria-label="Agregar un choripán">+</button>
+          </div>
+        </div>
+        <fieldset class="opciones">
+          <legend class="etq">¿Cómo pagó?</legend>
+          <label class="check"><input type="radio" name="carpa-medio" value="nequi" checked> Nequi</label>
+          <label class="check"><input type="radio" name="carpa-medio" value="efectivo"> Efectivo</label>
+        </fieldset>
+        <button class="btn btn-grande" id="carpa-btn">Anotar venta</button>
+      </form>
+      <div class="lista" id="ev-carpa"></div>
+
+      <h2 class="seccion">Lo que hay que llevar</h2>
+      <form class="fila-btn" id="f-planeados">
+        <label class="etq">Choripanes que vamos a llevar en total
+          <input class="campo" id="ev-planeados" inputmode="numeric">
+        </label>
+        <button class="btn btn-sec btn-chico">Guardar</button>
+      </form>
+      <div class="tabla-caja"><table class="tabla" id="ev-ingredientes"></table></div>
+      <p class="nota">Va aparte de Producción y de la cuenta con la fábrica. Las cantidades de salsas, carbón y papel son un cálculo por choripán; ajústenlas a su gusto.</p>
+
+      <h2 class="seccion">Cuentas del evento</h2>
+      <div class="tabla-caja"><table class="tabla" id="ev-cuentas"></table></div>
     </section>
   </main>
 

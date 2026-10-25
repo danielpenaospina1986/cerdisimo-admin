@@ -5,7 +5,8 @@
 import { crearStore, modoPrueba } from "./datos.js";
 import {
   PRODUCTOS, precios, calcularPedido, hoyISO, fechaLarga, plata, enlaceWhatsApp,
-  ESTADOS, CORTE, viernesParaPedidoWeb, corteDe, venceAlCorte, codigoPedido
+  ESTADOS, CORTE, viernesParaPedidoWeb, corteDe, venceAlCorte, codigoPedido,
+  EVENTO, esDelEvento, preventaAbierta
 } from "../negocio.js";
 
 const $ = (s) => document.querySelector(s);
@@ -130,6 +131,7 @@ function pintarPedir() {
   $("#entrega-info").innerHTML = "Llega el <strong>" + fechaLarga(v) + "</strong>. Recibimos pedidos para ese viernes hasta el " +
     fechaLarga(isoDe(corteDe(v))) + " a las 12 m.";
   pintarProductos();
+  pintarEvento();
 }
 const isoDe = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 
@@ -195,6 +197,59 @@ $("#f-pedir").addEventListener("submit", async (e) => {
 });
 
 // =====================================================================
+// Preventa de choripanes para la chorizada en Dogstar
+// =====================================================================
+let choripanes = 0;
+
+function pintarEvento() {
+  const abierta = preventaAbierta();
+  $("#f-evento").hidden = !abierta;
+  if (!abierta) return;
+  const p = P();
+  $("#evento-cuando").innerHTML = "<strong>" + fechaLarga(EVENTO.fecha).replace(/^./, (c) => c.toUpperCase()) + "</strong>, de " + EVENTO.horario +
+    " Cierre de año y apertura de la temporada navideña. La preventa va hasta el " + fechaLarga(isoDe(corteDe(EVENTO.fecha))) + " a las 12 m.";
+  $("#evento-precio").textContent = plata(p.precioChoripan);
+  $("#evento-sitio").textContent = p.precioChoripanSitio > p.precioChoripan ? "(en la carpa vale " + plata(p.precioChoripanSitio) + ")" : "";
+  $("#evento-n").textContent = choripanes;
+  $("#evento-prod").classList.toggle("activo", choripanes > 0);
+  $("#evento-total").innerHTML = choripanes
+    ? "Total: <strong>" + plata(choripanes * p.precioChoripan) + "</strong><br>" + choripanes + (choripanes === 1 ? " choripán" : " choripanes") + " para reclamar en Dogstar"
+    : "Elige cuántos choripanes quieres.";
+  $("#evento-btn").disabled = !choripanes;
+}
+
+$("#f-evento").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-paso-evento]");
+  if (!b) return;
+  choripanes = Math.max(0, Math.min(20, choripanes + Number(b.dataset.pasoEvento)));
+  pintarEvento();
+});
+
+$("#f-evento").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = $("#evento-error");
+  err.textContent = "";
+  if (!choripanes) { err.textContent = "Elige cuántos choripanes quieres."; return; }
+  if (!preventaAbierta()) { err.textContent = "La preventa ya cerró. Te esperamos en la carpa."; pintarEvento(); return; }
+  const items = { choripan: choripanes };
+  const calc = calcularPedido(items, P(), true);
+  const btn = $("#evento-btn"); btn.disabled = true;
+  try {
+    const hoy = hoyISO();
+    const id = await store.crearPedido({
+      origen: "web", uid: usuario.uid, clienteId: usuario.uid, clienteNombre: ficha.nombre,
+      fechaPedido: hoy, fechaEntrega: EVENTO.fecha, evento: EVENTO.id, items, recoge: true, ...calc,
+      pagado: false, entregado: false, estado: "por_pagar", notas: "Preventa " + EVENTO.nombre,
+      creado: hoy, creadoEn: new Date().toISOString()
+    });
+    choripanes = 0;
+    irAPagar(id);
+  } catch (x) {
+    err.textContent = "No se pudo guardar la preventa: " + x.message;
+  } finally { btn.disabled = false; pintarEvento(); }
+});
+
+// =====================================================================
 // Pagar
 // =====================================================================
 function irAPagar(id) { ui.pagando = id; ui.vista = "pagar"; pintar(); window.scrollTo(0, 0); }
@@ -227,7 +282,7 @@ function pintarPagar() {
     wa.href = enlaceWhatsApp(cfg.whatsapp, "Hola, pagué el pedido " + codigo + " por " + plata(p.total) + ". Te mando la captura del comprobante.");
   } else wa.hidden = true;
   $("#pagar-corte").textContent = "Si no pagas antes del " + fechaLarga(isoDe(corteDe(p.fechaEntrega))) + " a las 12 m., el pedido se cancela solo. " +
-    "Si prefieres pagar contra entrega, pídelo por WhatsApp.";
+    (esDelEvento(p) ? "Igual puedes comprar tu choripán en la carpa a " + plata(cfg.precioChoripanSitio) + "." : "Si prefieres pagar contra entrega, pídelo por WhatsApp.");
 }
 
 $("#f-pagar").addEventListener("submit", async (e) => {
@@ -255,9 +310,13 @@ const AYUDA = {
 function pintarMis() {
   const lista = pedidos.slice().sort((a, b) => (b.creadoEn || b.fechaPedido || "").localeCompare(a.creadoEn || a.fechaPedido || ""));
   $("#mis-lista").innerHTML = lista.length ? lista.map((p) => {
+    const evento = esDelEvento(p);
     const estado = p.entregado ? "entregado" : p.estado;
-    const nombreEstado = p.entregado ? "Entregado" : ESTADOS[p.estado] || p.estado;
-    const ayuda = p.entregado ? "¡Que lo disfrutes!"
+    const nombreEstado = p.entregado ? "Entregado" : evento && p.estado === "aprobado" && Number(p.choripanesEntregados) ? "Entregado en parte" : ESTADOS[p.estado] || p.estado;
+    const dados = Number(p.choripanesEntregados) || 0;
+    const ayuda = p.entregado ? (evento ? "Ya te entregamos " + (p.choripanes === 1 ? "tu choripán" : "tus " + p.choripanes + " choripanes") + ". ¡Que los disfrutes!" : "¡Que lo disfrutes!")
+      : evento && p.estado === "aprobado" && dados ? "Te hemos entregado " + dados + " de " + p.choripanes + ". Los demás los reclamas en la carpa con el código " + codigoPedido(p) + "."
+      : evento && p.estado === "aprobado" ? "Pago aprobado. En la carpa muestra el código " + codigoPedido(p) + " o di tu nombre."
       : p.estado === "cancelado" ? (p.canceladoPor === "corte" ? "Se canceló porque no se pagó antes del corte." : "Lo cancelaste.")
       : p.estado === "rechazado" && p.notaPago ? "No encontramos tu pago: " + esc(p.notaPago)
       : AYUDA[p.estado] || "";
@@ -267,12 +326,13 @@ function pintarMis() {
       '<div class="pedido-cab"><p class="pedido-nombre"><span class="pedido-codigo">' + codigoPedido(p) + "</span></p>" +
       '<span class="estado ' + (p.entregado ? "verde" : COLOR[p.estado] || "gris") + '">' + nombreEstado + "</span>" +
       '<span class="pedido-total">' + plata(p.total) + "</span></div>" +
-      "<p>" + esc(p.resumen) + (p.domi ? " + domicilio " + plata(p.domi) : p.recoge ? " · lo recoges" : " · domicilio gratis") + "</p>" +
-      "<p>Entrega: " + fechaLarga(p.fechaEntrega) + "</p>" +
+      "<p>" + esc(p.resumen) + (evento ? " · preventa" : p.domi ? " + domicilio " + plata(p.domi) : p.recoge ? " · lo recoges" : " · domicilio gratis") + "</p>" +
+      (evento ? "<p>Lo reclamas en " + EVENTO.lugar + " el " + fechaLarga(p.fechaEntrega) + " desde las " + EVENTO.desde + "</p>"
+        : "<p>Entrega: " + fechaLarga(p.fechaEntrega) + "</p>") +
       (ayuda ? "<p><em>" + ayuda + "</em></p>" : "") +
       '<div class="pedido-acc">' +
       (puedePagar ? '<button class="btn btn-chico" data-acc="pagar" data-id="' + p.id + '">Pagar</button>' : "") +
-      '<button class="btn btn-sec btn-chico" data-acc="repetir" data-id="' + p.id + '">Repetir pedido</button>' +
+      (evento ? "" : '<button class="btn btn-sec btn-chico" data-acc="repetir" data-id="' + p.id + '">Repetir pedido</button>') +
       (puedeCancelar ? '<button class="btn btn-peligro btn-chico" data-acc="cancelar" data-id="' + p.id + '">Cancelar</button>' : "") +
       "</div></article>";
   }).join("") : '<div class="tarjeta vacio"><p>Todavía no tienes pedidos.</p><button class="btn" data-acc="ir-pedir">Hacer mi primer pedido</button></div>';
