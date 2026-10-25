@@ -3,7 +3,8 @@ import {
   PRODUCTOS, PRECIOS_BASE, SOCIOS, precios, calcularPedido, hoyISO, sumarDias, viernesDeEntrega, viernesActual,
   fechaLarga, fechaCorta, nombreMes, plata, leerPlata, resumenMes, saldos,
   enlaceGoogle, enlaceApple, enlaceWhatsApp, ordenarDesdeElNorte, ordenDeReparto, enlaceRutaGoogle,
-  necesidadesEntrega, viernesConPedidos, ESTADOS, venceAlCorte, pasoElCorte, codigoPedido, saldoNequi, cuentaFabrica
+  necesidadesEntrega, viernesConPedidos, ESTADOS, venceAlCorte, pasoElCorte, codigoPedido, saldoNequi, cuentaFabrica,
+  TODOS_PRODUCTOS, CHORIPANES, EVENTO, esDelEvento
 } from "../negocio.js";
 
 const $ = (s) => document.querySelector(s);
@@ -145,7 +146,7 @@ function tarjetaPedido(p, n) {
     '<p class="pedido-nombre">' + esc(nombre) + "</p>" +
     '<span class="estado ' + color + '">' + estadoTxt + "</span>" +
     '<span class="pedido-total">' + plata(p.total) + "</span></div>" +
-    "<p>" + esc(p.resumen) + (p.domi ? " + domi " + plata(p.domi) : p.recoge ? " · lo recoge" : " · domi gratis") +
+    "<p>" + esc(p.resumen) + (esDelEvento(p) ? " · preventa, lo reclama en Dogstar" : p.domi ? " + domi " + plata(p.domi) : p.recoge ? " · lo recoge" : " · domi gratis") +
     (p.entregado ? " · <strong>Entregado</strong>" : "") + "</p>" +
     pagoWeb +
     "<p>" + dir + "</p><p>" + tel + "</p>" +
@@ -505,9 +506,15 @@ document.addEventListener("click", (e) => {
 let pedidoEditando = null;
 const cantidades = {};
 
+// Los choripanes de Dogstar salen en el formulario hasta dos días después del evento, o si el
+// pedido que se edita los tiene (para anotar las ventas de la carpa o corregir una preventa)
+const conChoripanes = () => hoyISO() <= sumarDias(EVENTO.fecha, 2) ||
+  CHORIPANES.some((x) => Number(cantidades[x.id]) > 0 || (pedidoEditando && Number((pedidoEditando.items || {})[x.id]) > 0));
+
 function pintarProductos() {
   const p = precios(datos);
-  $("#p-productos").innerHTML = '<legend class="etq">¿Qué pidió?</legend>' + PRODUCTOS.map((prod) =>
+  const lista = conChoripanes() ? TODOS_PRODUCTOS : PRODUCTOS;
+  $("#p-productos").innerHTML = '<legend class="etq">¿Qué pidió?</legend>' + lista.map((prod) =>
     '<div class="prod' + (cantidades[prod.id] ? " activo" : "") + '"><div class="prod-n">' + prod.nombre + " · " + plata(p[prod.precio]) +
     "<small>" + prod.detalle + '</small></div><div class="stepper">' +
     '<button type="button" data-paso="-1" data-prod="' + prod.id + '" aria-label="Quitar ' + prod.nombre + '">−</button>' +
@@ -529,9 +536,10 @@ const precioDelPedido = () => precios(datos);
 
 function actualizarTotal() {
   const c = calcularPedido(cantidades, precioDelPedido(), $("#p-recoge").checked);
-  $("#p-total").innerHTML = c.paquetes
-    ? "Total a cobrar: <strong>" + plata(c.total) + "</strong><br>" + c.paquetes + " paquetes" + (c.litros ? " + " + c.litros + " L" : "") +
-      (c.domi ? " · incluye domi de " + plata(c.domi) : $("#p-recoge").checked ? " · lo recoge" : " · domi gratis")
+  const cuanto = [c.paquetes ? c.paquetes + " paquetes" : "", c.litros ? c.litros + " L" : "", c.choripanes ? c.choripanes + (c.choripanes === 1 ? " choripán" : " choripanes") : ""].filter(Boolean).join(" + ");
+  $("#p-total").innerHTML = c.unidades
+    ? "Total a cobrar: <strong>" + plata(c.total) + "</strong><br>" + cuanto +
+      (c.domi ? " · incluye domi de " + plata(c.domi) : c.choripanes && !c.paquetes ? " · en Dogstar" : $("#p-recoge").checked ? " · lo recoge" : " · domi gratis")
     : "Agrega al menos un producto.";
 }
 $("#p-recoge").onchange = actualizarTotal;
@@ -597,20 +605,22 @@ $("#f-pedido").addEventListener("submit", async (e) => {
   const err = $("#p-error");
   const nombre = $("#p-cliente").value.trim();
   const items = {};
-  PRODUCTOS.forEach((x) => { if (cantidades[x.id]) items[x.id] = cantidades[x.id]; });
+  TODOS_PRODUCTOS.forEach((x) => { if (cantidades[x.id]) items[x.id] = cantidades[x.id]; });
   const recoge = $("#p-recoge").checked;
   const calc = calcularPedido(items, precioDelPedido(), recoge);
   if (!nombre) { err.textContent = "Escribe el nombre del cliente."; return; }
-  if (!calc.paquetes) { err.textContent = "Agrega al menos un producto."; return; }
+  if (!calc.unidades) { err.textContent = "Agrega al menos un producto."; return; }
   const btn = $("#p-guardar"); btn.disabled = true;
   try {
     const base = {
       fechaPedido: $("#p-fecha").value, fechaEntrega: $("#p-entrega").value,
       items, recoge, ...calc, pagado: $("#p-pagado").checked, notas: $("#p-notas").value.trim()
     };
+    // Un pedido solo de choripanes es de la chorizada: no lleva domicilio ni entra en la ruta
+    if (calc.choripanes && !calc.paquetes) { base.evento = EVENTO.id; base.recoge = true; }
     if (pedidoEditando) {
       // Si no cambió lo pedido, se conservan los precios con que se creó
-      const igual = PRODUCTOS.every((x) => Number((pedidoEditando.items || {})[x.id] || 0) === Number(items[x.id] || 0)) && !!pedidoEditando.recoge === recoge;
+      const igual = TODOS_PRODUCTOS.every((x) => Number((pedidoEditando.items || {})[x.id] || 0) === Number(items[x.id] || 0)) && !!pedidoEditando.recoge === recoge;
       if (igual) Object.keys(calc).forEach((k) => delete base[k]);
       if (esWeb(pedidoEditando) && base.pagado !== !!pedidoEditando.pagado) base.estado = base.pagado ? "aprobado" : "por_verificar";
       await store.actualizar("pedidos", pedidoEditando.id, base);
@@ -1106,7 +1116,9 @@ const CAMPOS_PRECIO = [
   ["precio1", "1 paquete"], ["precio2", "2 paquetes"], ["precio3", "3 paquetes (promo)"],
   ["precioAsado", "Combo Asado"], ["precioFinquero", "Combo Finquero"],
   ["domi", "Domi para 1 o 2 paquetes"], ["envio", "Fondo de gasolina por pedido"],
-  ["costoPaquete", "Costo de un paquete"], ["costoLitro", "Costo de un litro de aguardiente"]
+  ["costoPaquete", "Costo de un paquete"], ["costoLitro", "Costo de un litro de aguardiente"],
+  ["precioChoripan", "Choripán en preventa (Dogstar)"], ["precioChoripanSitio", "Choripán en la carpa (Dogstar)"],
+  ["costoChoripan", "Costo por choripán sin el chorizo (pan, salsas, carbón)"]
 ];
 let preciosPintados = false;
 function pintarPrecios() {
@@ -1172,7 +1184,7 @@ function pintarProduccion() {
   $("#pr-paquetes").textContent = n.paquetes;
   $("#pr-paquetes-u").textContent = plural(n.paquetes, "paquete de chorizos", "paquetes de chorizos");
   $("#pr-paquetes-det").textContent = n.pedidos.length
-    ? n.chorizos + " chorizos · " + n.pedidos.length + " " + plural(n.pedidos.length, "pedido", "pedidos")
+    ? n.chorizos + " chorizos" + (n.choripanes ? " (" + n.choripanes + " para choripanes de Dogstar)" : "") + " · " + n.pedidos.length + " " + plural(n.pedidos.length, "pedido", "pedidos")
     : "Todavía no hay pedidos para este viernes.";
 
   $("#pr-litros").textContent = n.litros;

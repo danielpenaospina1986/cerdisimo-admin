@@ -79,6 +79,24 @@
           <h1 class="titulo">¿Qué te llevamos?</h1>
         </div>
       </div>
+      <!-- Preventa de la chorizada en Dogstar: se muestra hasta el corte del jueves antes del evento -->
+      <form class="tarjeta evento" id="f-evento" hidden>
+        <p class="eyebrow">Preventa · solo en la app</p>
+        <h2 class="evento-t">Chorizada en Dogstar</h2>
+        <p class="evento-cuando" id="evento-cuando"></p>
+        <p class="evento-precio"><span id="evento-precio">$10.000</span> el choripán <small id="evento-sitio">(en la carpa vale $12.000)</small></p>
+        <div class="prod" id="evento-prod">
+          <div class="prod-n">Choripán<small>Chorizo, pan, chimichurri y miel picante. Lo reclamas en la carpa.</small></div>
+          <div class="stepper">
+            <button type="button" data-paso-evento="-1" aria-label="Quitar un choripán">−</button>
+            <output id="evento-n">0</output>
+            <button type="button" data-paso-evento="1" aria-label="Agregar un choripán">+</button>
+          </div>
+        </div>
+        <div class="total" id="evento-total"></div>
+        <p class="error" id="evento-error"></p>
+        <button class="btn btn-grande" id="evento-btn" disabled>Comprar preventa</button>
+      </form>
       <p class="entrega-info" id="entrega-info"></p>
       <form id="f-pedir" class="form">
         <fieldset class="productos" id="productos"></fieldset>

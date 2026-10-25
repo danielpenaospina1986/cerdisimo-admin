@@ -11,7 +11,10 @@ export const PRECIOS_BASE = {
   precio2: 40000,
   precio3: 55000,
   precioAsado: 140000,
-  precioFinquero: 330000
+  precioFinquero: 330000,
+  precioChoripan: 10000,      // preventa en la tienda para la chorizada en Dogstar
+  precioChoripanSitio: 12000, // el mismo choripán comprado en la carpa
+  costoChoripan: 1700         // pan, chimichurri, miel picante, carbón y servilleta (sin el chorizo)
 };
 
 export const PRODUCTOS = [
@@ -22,6 +25,25 @@ export const PRODUCTOS = [
   { id: "finquero", nombre: "Combo Finquero", detalle: "10 paquetes + 3 L de aguardiente", paquetes: 10, litros: 3, precio: "precioFinquero" }
 ];
 
+// Chorizada en Dogstar (cierre de año, apertura navideña y los 40 de Daniel). Los choripanes
+// no se cuentan en paquetes: cada uno lleva un chorizo suelto, más el pan y las salsas.
+export const EVENTO = {
+  id: "dogstar-2026-11",
+  nombre: "Chorizada en Dogstar",
+  fecha: "2026-11-20",
+  lugar: "Dogstar, Medellín",
+  desde: "6:30 p. m.",
+  horario: "6:30 p. m. a 2 a. m."
+};
+export const CHORIPANES = [
+  { id: "choripan", nombre: "Choripán", detalle: "Preventa · lo reclamas en Dogstar", paquetes: 0, litros: 0, chorizos: 1, precio: "precioChoripan" },
+  { id: "choripanSitio", nombre: "Choripán en el sitio", detalle: "Vendido en la carpa de Dogstar", paquetes: 0, litros: 0, chorizos: 1, precio: "precioChoripanSitio" }
+];
+export const TODOS_PRODUCTOS = PRODUCTOS.concat(CHORIPANES);
+export const esDelEvento = (p) => !!p && p.evento === EVENTO.id;
+// La preventa cierra con el corte de siempre: el jueves antes del evento a las 12 m.
+export const preventaAbierta = (ahora = new Date()) => ahora < corteDe(EVENTO.fecha);
+
 export const SOCIOS = ["Daniel", "Mariana"];
 
 export function precios(datos) {
@@ -31,21 +53,23 @@ export function precios(datos) {
 
 // items: { p1: 2, asado: 1, ... }
 export function calcularPedido(items, p, recoge) {
-  let precio = 0, paquetes = 0, litros = 0;
+  let precio = 0, paquetes = 0, litros = 0, choripanes = 0;
   const lineas = [];
-  PRODUCTOS.forEach((prod) => {
+  TODOS_PRODUCTOS.forEach((prod) => {
     const n = Number(items[prod.id] || 0);
     if (!n) return;
     precio += n * p[prod.precio];
     paquetes += n * prod.paquetes;
     litros += n * prod.litros;
+    choripanes += n * (prod.chorizos || 0);
     lineas.push(n + " × " + prod.nombre);
   });
   const domi = !recoge && paquetes > 0 && paquetes < p.gratisDesde ? p.domi : 0;
   const envio = recoge || paquetes === 0 ? 0 : p.envio;
-  const costoProducto = paquetes * p.costoPaquete + litros * p.costoLitro;
+  const costoChoripanes = choripanes * (p.costoPaquete / CHORIZOS_POR_PAQUETE + p.costoChoripan);
+  const costoProducto = Math.round(paquetes * p.costoPaquete + litros * p.costoLitro + costoChoripanes);
   return {
-    precio, domi, total: precio + domi, paquetes, litros, costoProducto, envio,
+    precio, domi, total: precio + domi, paquetes, litros, choripanes, unidades: paquetes + choripanes, costoProducto, envio,
     ganancia: precio + domi - costoProducto - envio,
     resumen: lineas.join(", ")
   };
@@ -246,17 +270,19 @@ export function necesidadesEntrega(pedidos, viernes, conAtrasados) {
   const atrasados = conAtrasados ? pedidos.filter((p) => p.fechaEntrega && p.fechaEntrega < viernes && !p.entregado) : [];
   const todos = delViernes.concat(atrasados);
   const sum = (arr, k) => arr.reduce((t, p) => t + (Number(p[k]) || 0), 0);
-  const porProducto = PRODUCTOS.map((prod) => {
+  const porProducto = TODOS_PRODUCTOS.map((prod) => {
     const unidades = todos.reduce((t, p) => t + (Number((p.items || {})[prod.id]) || 0), 0);
     return { ...prod, unidades, paquetes: unidades * prod.paquetes, litros: unidades * prod.litros };
   }).filter((x) => x.unidades);
   const porEntregar = todos.filter((p) => !p.entregado);
   const paquetes = sum(todos, "paquetes");
+  const choripanes = porProducto.reduce((t, x) => t + x.unidades * (x.chorizos || 0), 0);
   return {
     pedidos: todos,
     paquetes,
+    choripanes,
     litros: sum(todos, "litros"),
-    chorizos: paquetes * CHORIZOS_POR_PAQUETE,
+    chorizos: paquetes * CHORIZOS_POR_PAQUETE + choripanes,
     porProducto,
     atrasados: atrasados.length,
     paquetesAtrasados: sum(atrasados, "paquetes"),

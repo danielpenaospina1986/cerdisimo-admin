@@ -43,6 +43,14 @@ Con la cuenta de Google dueña del proyecto de Firebase:
 
 El script lee Firestore con los permisos de esa cuenta (no pasa por `firestore.rules`) y recuerda qué pagos ya avisó. Google deja mandar unos 100 correos al día desde una cuenta Gmail; si se acaba el cupo, avisa al día siguiente y la campanita sigue funcionando.
 
+## Preventa de la chorizada en Dogstar (20 de noviembre de 2026)
+
+- En la tienda, arriba de los chorizos, sale la tarjeta **Chorizada en Dogstar**: el cliente elige cuántos choripanes quiere ($10.000 cada uno en preventa; en la carpa valen $12.000), paga por Nequi como siempre y lo reclama en la carpa mostrando su código.
+- La preventa cierra con el corte de siempre: jueves 19 de noviembre a las 12 m. Lo que no se pague para entonces se cancela solo.
+- En la administración las preventas salen en Entregas del viernes 20 de noviembre ("preventa, lo reclama en Dogstar") y no entran en la ruta. Producción cuenta los chorizos para choripanes aparte de los paquetes.
+- Para anotar lo vendido en la carpa: **Crear pedido** con el producto *Choripán en el sitio* (aparece hasta dos días después del evento).
+- Precios y costo por choripán (pan, salsas y carbón, sin el chorizo) se cambian en Contabilidad → Precios y costos. Datos del evento en `EVENTO` de `negocio.js`.
+
 ## Reglas de negocio (de la calculadora "Ganancias por pedido")
 
 | Producto | Precio |
