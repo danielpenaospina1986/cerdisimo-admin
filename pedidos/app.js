@@ -312,8 +312,10 @@ function pintarMis() {
   $("#mis-lista").innerHTML = lista.length ? lista.map((p) => {
     const evento = esDelEvento(p);
     const estado = p.entregado ? "entregado" : p.estado;
-    const nombreEstado = p.entregado ? "Entregado" : ESTADOS[p.estado] || p.estado;
-    const ayuda = p.entregado ? "¡Que lo disfrutes!"
+    const nombreEstado = p.entregado ? "Entregado" : evento && p.estado === "aprobado" && Number(p.choripanesEntregados) ? "Entregado en parte" : ESTADOS[p.estado] || p.estado;
+    const dados = Number(p.choripanesEntregados) || 0;
+    const ayuda = p.entregado ? (evento ? "Ya te entregamos " + (p.choripanes === 1 ? "tu choripán" : "tus " + p.choripanes + " choripanes") + ". ¡Que los disfrutes!" : "¡Que lo disfrutes!")
+      : evento && p.estado === "aprobado" && dados ? "Te hemos entregado " + dados + " de " + p.choripanes + ". Los demás los reclamas en la carpa con el código " + codigoPedido(p) + "."
       : evento && p.estado === "aprobado" ? "Pago aprobado. En la carpa muestra el código " + codigoPedido(p) + " o di tu nombre."
       : p.estado === "cancelado" ? (p.canceladoPor === "corte" ? "Se canceló porque no se pagó antes del corte." : "Lo cancelaste.")
       : p.estado === "rechazado" && p.notaPago ? "No encontramos tu pago: " + esc(p.notaPago)

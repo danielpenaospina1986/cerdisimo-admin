@@ -4,7 +4,7 @@ import {
   fechaLarga, fechaCorta, nombreMes, plata, leerPlata, resumenMes, saldos,
   enlaceGoogle, enlaceApple, enlaceWhatsApp, ordenarDesdeElNorte, ordenDeReparto, enlaceRutaGoogle,
   necesidadesEntrega, viernesConPedidos, ESTADOS, venceAlCorte, pasoElCorte, codigoPedido, saldoNequi, cuentaFabrica,
-  TODOS_PRODUCTOS, CHORIPANES, EVENTO, esDelEvento
+  TODOS_PRODUCTOS, CHORIPANES, EVENTO, esDelEvento, resumenEvento, RECETA_CHORIPAN, cantidadReceta
 } from "../negocio.js";
 
 const $ = (s) => document.querySelector(s);
@@ -56,6 +56,8 @@ function cancelarVencidos(pedidos) {
 const esWeb = (p) => p && p.origen === "web";
 // Lo que se produce: los pedidos creados aquí (pagados o no) y los de la app con pago aprobado
 const confirmado = (p) => !esWeb(p) || !!p.pagado;
+// Los pedidos de la chorizada en Dogstar van en su propia pestaña, no en Entregas ni en Producción
+const normales = () => datos.pedidos.filter((p) => !esDelEvento(p));
 
 function pedirLogin(entrar) {
   const d = $("#d-login");
@@ -84,11 +86,12 @@ document.querySelectorAll(".pestanas button").forEach((b) => {
 });
 
 function pintar() {
-  ["entregas", "contabilidad", "clientes", "produccion"].forEach((v) => { $("#vista-" + v).hidden = v !== ui.vista; });
+  ["entregas", "contabilidad", "clientes", "produccion", "evento"].forEach((v) => { $("#vista-" + v).hidden = v !== ui.vista; });
   if (ui.vista === "entregas") pintarEntregas();
   if (ui.vista === "contabilidad") pintarContabilidad();
   if (ui.vista === "clientes") pintarClientes();
   if (ui.vista === "produccion") pintarProduccion();
+  if (ui.vista === "evento") pintarEvento();
 }
 
 const cliente = (id) => datos.clientes.find((c) => c.id === id);
@@ -175,7 +178,7 @@ function pintarEntregas() {
   iniciarMapa();
   const v = ui.viernes;
   $("#v-titulo").textContent = fechaLarga(v);
-  const delDia = datos.pedidos.filter((p) => p.fechaEntrega === v)
+  const delDia = normales().filter((p) => p.fechaEntrega === v)
     .sort((a, b) => (!!a.entregado - !!b.entregado) || (a.clienteNombre || "").localeCompare(b.clienteNombre || ""));
   const paquetes = delDia.reduce((t, p) => t + (p.paquetes || 0), 0);
   const litros = delDia.reduce((t, p) => t + (p.litros || 0), 0);
@@ -239,7 +242,7 @@ function pintarEntregas() {
       .map((p) => tarjetaPedido(p, numero.get(p.id))).join("")
     : '<p class="nota">No hay pedidos para este viernes.</p>';
 
-  const atrasados = datos.pedidos.filter((p) => p.fechaEntrega < v && (!p.entregado || !p.pagado) && v === viernesActual());
+  const atrasados = normales().filter((p) => p.fechaEntrega < v && (!p.entregado || !p.pagado) && v === viernesActual());
   $("#v-atrasados").innerHTML = atrasados.length
     ? '<h2 class="seccion">De viernes anteriores (sin entregar o sin pagar)</h2><div class="lista">' +
       atrasados.sort((a, b) => a.fechaEntrega.localeCompare(b.fechaEntrega)).map((p) => tarjetaPedido(p)).join("") + "</div>"
@@ -248,7 +251,7 @@ function pintarEntregas() {
 
 // Pedidos del viernes que van a domicilio y cuyo cliente tiene pin, como paradas del mapa
 function paradasDelViernes(v) {
-  return datos.pedidos.filter((p) => p.fechaEntrega === v && !p.recoge && tienePin(cliente(p.clienteId)))
+  return normales().filter((p) => p.fechaEntrega === v && !p.recoge && tienePin(cliente(p.clienteId)))
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((p) => ({ ...cliente(p.clienteId), pedido: p }));
 }
@@ -506,10 +509,8 @@ document.addEventListener("click", (e) => {
 let pedidoEditando = null;
 const cantidades = {};
 
-// Los choripanes de Dogstar salen en el formulario hasta dos días después del evento, o si el
-// pedido que se edita los tiene (para anotar las ventas de la carpa o corregir una preventa)
-const conChoripanes = () => hoyISO() <= sumarDias(EVENTO.fecha, 2) ||
-  CHORIPANES.some((x) => Number(cantidades[x.id]) > 0 || (pedidoEditando && Number((pedidoEditando.items || {})[x.id]) > 0));
+// Los choripanes de Dogstar se anotan en su pestaña; aquí solo salen al editar un pedido que los tenga
+const conChoripanes = () => CHORIPANES.some((x) => Number(cantidades[x.id]) > 0 || (pedidoEditando && Number((pedidoEditando.items || {})[x.id]) > 0));
 
 function pintarProductos() {
   const p = precios(datos);
@@ -1171,8 +1172,8 @@ function pintarProduccion() {
   const proxima = viernesActual();
   const v = ui.viernesProd || proxima;
   const esProxima = v === proxima;
-  const n = necesidadesEntrega(datos.pedidos.filter(confirmado), v, esProxima);
-  const espera = necesidadesEntrega(datos.pedidos.filter((p) => !confirmado(p)), v, esProxima);
+  const n = necesidadesEntrega(normales().filter(confirmado), v, esProxima);
+  const espera = necesidadesEntrega(normales().filter((p) => !confirmado(p)), v, esProxima);
   $("#pr-titulo").textContent = fechaLarga(v);
 
   const frase = esProxima ? "Para la próxima entrega debemos tener"
@@ -1216,14 +1217,147 @@ function pintarProduccion() {
         '<tr class="suma"><td>Total</td><td></td><td class="num">' + n.paquetes + '</td><td class="num">' + n.litros + "</td></tr>"
       : '<tr class="vacia"><td colspan="4">Sin pedidos para este viernes.</td></tr>') + "</tbody>";
 
-  const viernes = viernesConPedidos(datos.pedidos.filter(confirmado), proxima);
+  const viernes = viernesConPedidos(normales().filter(confirmado), proxima);
   if (!viernes.includes(proxima)) viernes.unshift(proxima);
   $("#pr-proximas").innerHTML = "<thead><tr><th>Viernes</th><th class=num>Pedidos</th><th class=num>Paquetes</th><th class=num>Litros</th></tr></thead><tbody>" +
     viernes.map((f) => {
-      const x = necesidadesEntrega(datos.pedidos.filter(confirmado), f, f === proxima);
+      const x = necesidadesEntrega(normales().filter(confirmado), f, f === proxima);
       return '<tr tabindex="0" data-viernes="' + f + '"' + (f === v ? ' class="sel" aria-current="true"' : "") + "><td>" + fechaCorta(f) + (f === proxima ? " <span class=\"tag verde\">próxima</span>" : "") +
         '</td><td class="num">' + x.pedidos.length + '</td><td class="num">' + x.paquetes + '</td><td class="num">' + x.litros + "</td></tr>";
     }).join("") + "</tbody>";
 }
+
+// =====================================================================
+// 5. CHORIZADA EN DOGSTAR
+// =====================================================================
+// Aparte de los pedidos normales: quién compró preventa y cuántos choripanes se le han entregado,
+// las ventas de la carpa, lo que hay que llevar y las cuentas del evento.
+let carpaN = 1;
+const planeados = () => {
+  const doc = datos.config.find((c) => c.id === "evento");
+  return doc && Number(doc.planeados) > 0 ? Number(doc.planeados) : EVENTO.planeados;
+};
+const choris = (n) => n + (n === 1 ? " choripán" : " choripanes");
+
+function tarjetaPreventa(p, r) {
+  const c = cliente(p.clienteId) || {};
+  const total = Number(p.choripanes) || 0;
+  const dados = r.entregadosDe(p);
+  const completo = dados >= total;
+  const tel = c.telefono ? '<a class="enlace" href="tel:' + esc(c.telefono.replace(/\s/g, "")) + '">' + esc(c.telefono) + "</a>" : "";
+  const pago = p.pagado ? '<span class="estado verde">Pagado</span>'
+    : '<span class="estado rojo">' + esc(ESTADOS[p.estado] || "Sin pagar") + "</span>";
+  return '<article class="pedido ' + (p.pagado ? "pagado" : "pendiente") + (completo ? " entregado" : "") + '" data-pedido="' + esc(p.id) + '">' +
+    '<div class="pedido-cab"><p class="pedido-nombre">' + esc(c.nombre || p.clienteNombre) + "</p>" + pago +
+    '<span class="pedido-total">' + plata(p.total) + "</span></div>" +
+    '<p><span class="tag app">' + codigoPedido(p) + "</span> " + choris(total) +
+    " · <strong>" + (completo ? "Entregado completo" : "Entregados " + dados + " de " + total) + "</strong></p>" +
+    (p.comprobante && !p.pagado ? "<p>Traslado a nombre de: <strong>" + esc(p.comprobante) + "</strong></p>" : "") +
+    (tel ? "<p>" + tel + "</p>" : "") +
+    '<div class="pedido-acc">' +
+    (!p.pagado ? '<button class="btn btn-chico" data-acc="aprobar" data-id="' + p.id + '">Aprobar pago</button>' : "") +
+    (!completo ? '<button class="btn btn-chico" data-acc="ev-uno" data-id="' + p.id + '">Entregar 1</button>' : "") +
+    (!completo && total - dados > 1 ? '<button class="btn btn-sec btn-chico" data-acc="ev-todos" data-id="' + p.id + '">Entregar los ' + (total - dados) + "</button>" : "") +
+    (dados ? '<button class="btn btn-sec btn-chico" data-acc="ev-quitar" data-id="' + p.id + '">Deshacer 1</button>' : "") +
+    "</div></article>";
+}
+
+function pintarEvento() {
+  const r = resumenEvento(datos.pedidos);
+  const p = precios(datos);
+  $("#ev-fecha").textContent = fechaLarga(EVENTO.fecha) + " · " + EVENTO.horario;
+  $("#ev-resumen").innerHTML =
+    '<span class="chip rust">Preventa pagada: ' + choris(r.preventaPagada) + "</span>" +
+    (r.preventaSinPagar ? '<span class="chip app">Sin pagar o por verificar: ' + choris(r.preventaSinPagar) + "</span>" : "") +
+    '<span class="chip verde">Entregados: ' + r.entregados + " de " + r.preventaPagada + "</span>" +
+    '<span class="chip">Vendidos en la carpa: ' + r.vendidosCarpa + "</span>";
+
+  const q = norm($("#ev-buscar").value);
+  const lista = r.preventas.filter((x) => !q || norm(x.clienteNombre).includes(q) || norm(codigoPedido(x)).includes(q))
+    .sort((a, b) => ((r.entregadosDe(a) >= a.choripanes) - (r.entregadosDe(b) >= b.choripanes)) || !!b.pagado - !!a.pagado ||
+      (a.clienteNombre || "").localeCompare(b.clienteNombre || ""));
+  $("#ev-lista").innerHTML = lista.length ? lista.map((x) => tarjetaPreventa(x, r)).join("")
+    : '<p class="nota">' + (q ? "Nadie con ese nombre o código." : "Todavía no hay preventas.") + "</p>";
+
+  $("#carpa-n").textContent = carpaN;
+  $("#carpa-precio").innerHTML = "Choripán en el sitio · " + plata(p.precioChoripanSitio) + "<small>Total: " + plata(carpaN * p.precioChoripanSitio) + "</small>";
+  $("#ev-carpa").innerHTML = r.carpa.slice().sort((a, b) => String(b.creadoEn || "").localeCompare(String(a.creadoEn || ""))).map((x) =>
+    '<article class="pedido pagado"><div class="pedido-cab"><p class="pedido-nombre">' + choris(Number(x.choripanes) || 0) + "</p>" +
+    '<span class="estado verde">' + (x.medio === "efectivo" ? "Efectivo" : "Nequi") + "</span>" +
+    '<span class="pedido-total">' + plata(x.total) + "</span></div>" +
+    "<p>" + (x.creadoEn ? new Date(x.creadoEn).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" }) : fechaCorta(x.fechaPedido)) + "</p>" +
+    '<div class="pedido-acc"><button class="btn btn-peligro btn-chico" data-acc="borrar-pedido" data-id="' + x.id + '">Borrar</button></div></article>'
+  ).join("");
+
+  const n = planeados();
+  if (document.activeElement !== $("#ev-planeados")) $("#ev-planeados").value = n;
+  $("#ev-ingredientes").innerHTML = "<thead><tr><th>Ingrediente</th><th class=num>Preventa (" + r.preventaPagada + ")</th><th class=num>Total (" + n + ")</th></tr></thead><tbody>" +
+    RECETA_CHORIPAN.map((x) => "<tr><td><strong>" + esc(x.nombre) + "</strong>" + (x.compra ? "<br><small>Comprar " + x.compra(n) + "</small>" : "") +
+      '</td><td class="num">' + cantidadReceta(x, r.preventaPagada) + '</td><td class="num">' + cantidadReceta(x, n) + "</td></tr>").join("") + "</tbody>";
+
+  const fila = (a, b, cls) => "<tr" + (cls ? ' class="' + cls + '"' : "") + "><td>" + a + '</td><td class="num">' + b + "</td></tr>";
+  $("#ev-cuentas").innerHTML = "<tbody>" +
+    fila("Ventas cobradas (preventa y carpa)", plata(r.ventas)) +
+    fila("De eso, en efectivo (no entra a Nequi)", plata(r.efectivo)) +
+    fila("Costo de lo vendido (chorizo " + plata(p.costoPaquete / 5) + " + pan y salsas " + plata(p.costoChoripan) + " por choripán)", plata(r.costo)) +
+    fila("Ganancia del evento", plata(r.ganancia), "suma") + "</tbody>";
+}
+
+$("#ev-buscar").addEventListener("input", pintarEvento);
+
+// Entregar choripanes de una preventa, uno por uno o todos los que falten
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-acc^='ev-']");
+  if (!b) return;
+  const p = datos.pedidos.find((x) => x.id === b.dataset.id);
+  if (!p) return;
+  const total = Number(p.choripanes) || 0;
+  const dados = resumenEvento([p]).entregadosDe(p);
+  let nuevo = dados;
+  if (b.dataset.acc === "ev-uno") nuevo = dados + 1;
+  if (b.dataset.acc === "ev-todos") nuevo = total;
+  if (b.dataset.acc === "ev-quitar") nuevo = dados - 1;
+  nuevo = Math.max(0, Math.min(total, nuevo));
+  if (nuevo > dados && !p.pagado && !confirm(p.clienteNombre + " no tiene el pago aprobado. ¿Entregar igual?")) return;
+  b.disabled = true;
+  try {
+    await store.actualizar("pedidos", p.id, { choripanesEntregados: nuevo, entregado: nuevo >= total, entregadoEn: nuevo ? new Date().toISOString() : null });
+  } catch (x) { alert("No se pudo guardar: " + x.message); b.disabled = false; }
+});
+
+$("#f-carpa").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-paso-carpa]");
+  if (!b) return;
+  carpaN = Math.max(1, Math.min(30, carpaN + Number(b.dataset.pasoCarpa)));
+  pintarEvento();
+});
+
+$("#f-carpa").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const items = { choripanSitio: carpaN };
+  const calc = calcularPedido(items, precios(datos), true);
+  const medio = document.querySelector('input[name="carpa-medio"]:checked').value;
+  const btn = $("#carpa-btn"); btn.disabled = true;
+  try {
+    const hoy = hoyISO();
+    await store.agregar("pedidos", {
+      clienteId: "", clienteNombre: "Venta en la carpa", evento: EVENTO.id, medio,
+      fechaPedido: hoy, fechaEntrega: EVENTO.fecha, items, recoge: true, ...calc,
+      pagado: true, entregado: true, notas: "", creado: hoy, creadoEn: new Date().toISOString()
+    });
+    carpaN = 1;
+    btn.textContent = "Venta anotada ✓";
+    setTimeout(() => { btn.textContent = "Anotar venta"; }, 2000);
+  } catch (x) { alert("No se pudo anotar: " + x.message); }
+  finally { btn.disabled = false; pintarEvento(); }
+});
+
+$("#f-planeados").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const n = leerPlata($("#ev-planeados").value);
+  if (!(n > 0)) return;
+  await store.fijar("config", "evento", { planeados: n });
+  $("#ev-planeados").blur();
+});
 
 iniciar();

@@ -33,8 +33,48 @@ export const EVENTO = {
   fecha: "2026-11-20",
   lugar: "Dogstar, Medellín",
   desde: "6:30 p. m.",
-  horario: "6:30 p. m. a 2 a. m."
+  horario: "6:30 p. m. a 2 a. m.",
+  planeados: 125 // choripanes que se piensan llevar, si no se ha guardado otro número en la pestaña Dogstar
 };
+// Lo que lleva cada choripán, para calcular cuánto comprar. Va aparte de los paquetes de los
+// pedidos normales: el evento no se mezcla con Producción ni con la cuenta de la fábrica.
+export const RECETA_CHORIPAN = [
+  { id: "chorizo", nombre: "Chorizos", por: 1, unidad: "", compra: (n) => Math.ceil(n / CHORIZOS_POR_PAQUETE) + " paquetes de 5" },
+  { id: "pan", nombre: "Panes", por: 1, unidad: "", compra: (n) => Math.ceil(n / 6) + " bolsas de 6" },
+  { id: "chimichurri", nombre: "Chimichurri", por: 0.015, unidad: "L", compra: null },
+  { id: "miel", nombre: "Miel picante", por: 0.012, unidad: "L", compra: null },
+  { id: "carbon", nombre: "Carbón", por: 0.12, unidad: "kg", compra: null },
+  { id: "servilletas", nombre: "Servilletas", por: 2, unidad: "", compra: null },
+  { id: "papel", nombre: "Papel para envolver", por: 1, unidad: "hojas", compra: null }
+];
+export function cantidadReceta(r, n) {
+  const v = r.por * n;
+  return r.unidad === "L" || r.unidad === "kg" ? (Math.ceil(v * 10) / 10).toLocaleString("es-CO") + " " + r.unidad : Math.ceil(v) + (r.unidad ? " " + r.unidad : "");
+}
+// Pedidos de la chorizada (preventas de la tienda y ventas de la carpa), sin los cancelados.
+// Los choripanes ya entregados de cada preventa van en choripanesEntregados.
+export function resumenEvento(pedidos) {
+  const del = pedidos.filter((p) => esDelEvento(p) && p.estado !== "cancelado");
+  const sum = (arr, f) => arr.reduce((t, x) => t + (Number(f(x)) || 0), 0);
+  const preventas = del.filter((p) => Number((p.items || {}).choripan) > 0);
+  const carpa = del.filter((p) => !(Number((p.items || {}).choripan) > 0));
+  const pagadas = preventas.filter((p) => p.pagado);
+  const cant = (p) => Number(p.choripanes) || 0;
+  const entregados = (p) => (p.entregado ? cant(p) : Math.min(cant(p), Number(p.choripanesEntregados) || 0));
+  const pagados = del.filter((p) => p.pagado);
+  return {
+    preventas, carpa,
+    preventaPagada: sum(pagadas, cant),
+    preventaSinPagar: sum(preventas.filter((p) => !p.pagado), cant),
+    entregados: sum(pagadas, entregados),
+    vendidosCarpa: sum(carpa, cant),
+    ventas: sum(pagados, (p) => p.total),
+    efectivo: sum(pagados.filter((p) => p.medio === "efectivo"), (p) => p.total),
+    costo: sum(pagados, (p) => p.costoProducto),
+    ganancia: sum(pagados, (p) => p.total - (Number(p.costoProducto) || 0)),
+    entregadosDe: entregados
+  };
+}
 export const CHORIPANES = [
   { id: "choripan", nombre: "Choripán", detalle: "Preventa · lo reclamas en Dogstar", paquetes: 0, litros: 0, chorizos: 1, precio: "precioChoripan" },
   { id: "choripanSitio", nombre: "Choripán en el sitio", detalle: "Vendido en la carpa de Dogstar", paquetes: 0, litros: 0, chorizos: 1, precio: "precioChoripanSitio" }
@@ -158,7 +198,8 @@ export function saldos(datos) {
 export function saldoNequi(datos) {
   const sum = (arr, f) => arr.reduce((t, x) => t + (Number(f(x)) || 0), 0);
   const movs = (tipo) => datos.movimientos.filter((m) => m.tipo === tipo);
-  const cobrado = sum(datos.pedidos.filter((p) => p.pagado), (p) => p.total);
+  // Lo cobrado en efectivo (ventas de la carpa en Dogstar) no pasa por Nequi
+  const cobrado = sum(datos.pedidos.filter((p) => p.pagado && p.medio !== "efectivo"), (p) => p.total);
   const proveedores = sum(movs("proveedor"), (m) => m.monto);
   const gastos = sum(movs("gasto"), (m) => m.monto);
   const liquidado = sum(movs("liquidacion"), (m) => m.monto);
