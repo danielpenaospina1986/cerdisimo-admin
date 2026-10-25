@@ -107,8 +107,12 @@
         <div class="tarjeta">
           <h2 class="subtitulo">Inversiones en el negocio</h2>
           <p class="cifra" id="c-invertido">$0</p>
+          <p class="nota" id="c-inv-evento"></p>
           <details class="cortes" id="c-inv-caja">
             <summary id="c-inv-resumen">Inversiones registradas</summary>
+            <label class="etq">Mostrar
+              <select class="campo" id="c-inv-filtro"><option value="todas">Todas</option><option value="evento">Solo las de Dogstar</option><option value="normales">Sin las de Dogstar</option></select>
+            </label>
             <div class="tabla-caja"><table class="tabla" id="c-inversiones"></table></div>
           </details>
           <button class="btn btn-sec" data-mov="inversion">Registrar inversión</button>
@@ -237,6 +241,9 @@
 
       <h2 class="seccion">Cuentas del evento</h2>
       <div class="tabla-caja"><table class="tabla" id="ev-cuentas"></table></div>
+      <button class="btn btn-sec" id="ev-compra" type="button">+ Registrar compra del evento</button>
+      <p class="nota">Las compras del evento se guardan como inversiones marcadas «Dogstar»: salen en Contabilidad con las demás y aquí se restan de lo vendido en el evento.</p>
+      <div class="tabla-caja"><table class="tabla" id="ev-compras"></table></div>
     </section>
   </main>
 
@@ -362,6 +369,7 @@
       <div class="fila-btn" id="m-todo-caja"><button type="button" class="btn btn-sec btn-chico" id="m-todo">Liquidar todo</button><span class="nota" id="m-disp"></span></div>
       <label class="etq">Fecha <input class="campo" id="m-fecha" type="date" required></label>
       <label class="etq">Descripción <input class="campo" id="m-desc" placeholder="Opcional"></label>
+      <label class="check" id="m-evento-l" hidden><input type="checkbox" id="m-evento"> Es para la chorizada en Dogstar</label>
       <p class="nota" id="m-ayuda"></p>
       <p class="error" id="m-error"></p>
       <div class="botonera">

@@ -51,7 +51,8 @@ El script lee Firestore con los permisos de esa cuenta (no pasa por `firestore.r
   - **Preventas**: quién compró, con buscador por nombre o código, para ir entregando en la carpa (de a uno o todos). El cliente ve en su app "Entregado en parte" o "Entregado".
   - **Ventas en la carpa**: se anotan con cuántos choripanes y si pagaron por Nequi o en efectivo. Lo de efectivo no se suma a lo que debe haber en Nequi.
   - **Lo que hay que llevar**: chorizos, panes, salsas, carbón, servilletas y papel según los choripanes planeados (por defecto 125).
-  - **Cuentas del evento**: ventas, costo y ganancia.
+  - **Cuentas del evento**: ventas menos las compras del evento = ganancia del evento.
+  - **Compras del evento**: se registran como inversiones con la casilla «Es para la chorizada en Dogstar» (desde el botón de la pestaña o desde Contabilidad). En Contabilidad salen con las demás inversiones, marcadas «Dogstar», y la lista se puede filtrar: todas, solo Dogstar o sin Dogstar.
 - Precios y costo por choripán (pan, salsas y carbón, sin el chorizo) se cambian en Contabilidad → Precios y costos. Datos del evento en `EVENTO` de `negocio.js`.
 
 ## Reglas de negocio (de la calculadora "Ganancias por pedido")
