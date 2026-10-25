@@ -46,7 +46,7 @@ El script lee Firestore con los permisos de esa cuenta (no pasa por `firestore.r
 ## Preventa de la chorizada en Dogstar (20 de noviembre de 2026)
 
 - En la tienda, arriba de los chorizos, sale la tarjeta **Chorizada en Dogstar**: el cliente elige cuántos choripanes quiere ($10.000 cada uno en preventa; en la carpa valen $12.000), paga por Nequi como siempre y lo reclama en la carpa mostrando su código.
-- La preventa cierra con el corte de siempre: jueves 19 de noviembre a las 12 m. Lo que no se pague para entonces se cancela solo.
+- La preventa cierra el sábado 14 de noviembre a las 11:59 p. m., para tener la semana del evento para producir. Lo que no se pague para entonces se cancela solo. La fecha está en `EVENTO.cierre` de `negocio.js`.
 - En la administración el evento tiene su propia pestaña, **Dogstar**, aparte de Entregas, Producción y la cuenta con la fábrica:
   - **Preventas**: quién compró, con buscador por nombre o código, para ir entregando en la carpa (de a uno o todos). El cliente ve en su app "Entregado en parte" o "Entregado".
   - **Ventas en la carpa**: se anotan con cuántos choripanes y si pagaron por Nequi o en efectivo. Lo de efectivo no se suma a lo que debe haber en Nequi.

@@ -207,7 +207,7 @@ function pintarEvento() {
   if (!abierta) return;
   const p = P();
   $("#evento-cuando").innerHTML = "<strong>" + fechaLarga(EVENTO.fecha).replace(/^./, (c) => c.toUpperCase()) + "</strong>, de " + EVENTO.horario +
-    " Cierre de año y apertura de la temporada navideña. La preventa va hasta el " + fechaLarga(isoDe(corteDe(EVENTO.fecha))) + " a las 12 m.";
+    " Cierre de año y apertura de la temporada navideña. La preventa va hasta el " + fechaLarga(EVENTO.cierre) + " " + EVENTO.cierreTexto;
   $("#evento-precio").textContent = plata(p.precioChoripan);
   $("#evento-sitio").textContent = p.precioChoripanSitio > p.precioChoripan ? "(en la carpa vale " + plata(p.precioChoripanSitio) + ")" : "";
   $("#evento-n").textContent = choripanes;
@@ -281,7 +281,8 @@ function pintarPagar() {
     wa.hidden = false;
     wa.href = enlaceWhatsApp(cfg.whatsapp, "Hola, pagué el pedido " + codigo + " por " + plata(p.total) + ". Te mando la captura del comprobante.");
   } else wa.hidden = true;
-  $("#pagar-corte").textContent = "Si no pagas antes del " + fechaLarga(isoDe(corteDe(p.fechaEntrega))) + " a las 12 m., el pedido se cancela solo. " +
+  $("#pagar-corte").textContent = "Si no pagas antes del " +
+    (esDelEvento(p) ? fechaLarga(EVENTO.cierre) + " " + EVENTO.cierreTexto : fechaLarga(isoDe(corteDe(p.fechaEntrega))) + " a las 12 m.") + ", el pedido se cancela solo. " +
     (esDelEvento(p) ? "Igual puedes comprar tu choripán en la carpa a " + plata(cfg.precioChoripanSitio) + "." : "Si prefieres pagar contra entrega, pídelo por WhatsApp.");
 }
 

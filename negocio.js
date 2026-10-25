@@ -34,6 +34,9 @@ export const EVENTO = {
   lugar: "Dogstar, Medellín",
   desde: "6:30 p. m.",
   horario: "6:30 p. m. a 2 a. m.",
+  // La preventa cierra el sábado antes del evento, para tener la semana para producir (Daniel, 25 oct)
+  cierre: "2026-11-14",
+  cierreTexto: "a las 11:59 p. m.",
   planeados: 125 // choripanes que se piensan llevar, si no se ha guardado otro número en la pestaña Dogstar
 };
 // Lo que lleva cada choripán, para calcular cuánto comprar. Va aparte de los paquetes de los
@@ -81,8 +84,13 @@ export const CHORIPANES = [
 ];
 export const TODOS_PRODUCTOS = PRODUCTOS.concat(CHORIPANES);
 export const esDelEvento = (p) => !!p && p.evento === EVENTO.id;
-// La preventa cierra con el corte de siempre: el jueves antes del evento a las 12 m.
-export const preventaAbierta = (ahora = new Date()) => ahora < corteDe(EVENTO.fecha);
+// Cierre de la preventa (hora del celular). Lo que no se haya pagado para entonces se cancela solo.
+export function cierrePreventa() {
+  const d = deISO(EVENTO.cierre);
+  d.setHours(23, 59, 0, 0);
+  return d;
+}
+export const preventaAbierta = (ahora = new Date()) => ahora < cierrePreventa();
 
 export const SOCIOS = ["Daniel", "Mariana"];
 
@@ -369,7 +377,8 @@ export const pasoElCorte = (viernes, ahora = new Date()) => ahora >= corteDe(vie
 
 // Un pedido de la app que sigue sin pagar cuando pasa el corte se cancela solo.
 export const venceAlCorte = (p, ahora = new Date()) =>
-  p.origen === "web" && (p.estado === "por_pagar" || p.estado === "rechazado") && pasoElCorte(p.fechaEntrega, ahora);
+  p.origen === "web" && (p.estado === "por_pagar" || p.estado === "rechazado") &&
+  (esDelEvento(p) ? ahora >= cierrePreventa() : pasoElCorte(p.fechaEntrega, ahora));
 
 // Código corto para identificar el pago en Nequi y en WhatsApp (CC- + 5 caracteres del ID).
 export const codigoPedido = (p) => "CC-" + String(p.id || "").replace(/[^a-z0-9]/gi, "").slice(0, 5).toUpperCase();
