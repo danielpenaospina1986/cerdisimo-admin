@@ -332,6 +332,7 @@ code { font-size: 0.9em; }
 .necesidad-det { margin: 6px 0 0; font-size: 14px; font-weight: 700; color: #4a3a30; text-wrap: balance; }
 .necesidad-det:empty { display: none; }
 /* Bodega de chorizos (Producción) y su aviso arriba en toda la app */
+.bodega { scroll-margin-top: 150px; }
 .bodega .cifra { margin-bottom: 8px; }
 .bodega-alerta { margin: 0 0 12px; padding: 10px 12px; background: var(--pendiente-fondo); color: var(--pendiente); border: var(--stroke-md) solid var(--ink); border-radius: var(--radius-md); font-weight: 800; }
 .botonera-izq { justify-content: flex-start; }

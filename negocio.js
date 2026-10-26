@@ -324,9 +324,11 @@ export function inicioBodega(movimientos) {
   return movimientos.filter(esRecibido).map((m) => m.fecha).filter(Boolean).sort()[0] || null;
 }
 
-// `pedidos`: los que se producen (confirmados, sin los del evento). `proxima`: viernes de la próxima
+// `pedidos`: los pedidos normales (sin los del evento), pagados o no. `proxima`: viernes de la próxima
 // entrega. `objetivo`: los paquetes que quieren tener en bodega después de cada entrega.
 export function bodega(pedidos, movimientos, proxima, objetivo) {
+  // Se producen los pedidos creados a mano y los de la app con pago aprobado (como en Producción)
+  const seProduce = (p) => p.origen !== "web" || !!p.pagado;
   const movs = movimientos.filter(esBodega).slice()
     .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "") || (b.creado || "").localeCompare(a.creado || ""));
   const obj = objetivo === "" || objetivo == null || !(Number(objetivo) >= 0) ? STOCK_OBJETIVO : Math.round(Number(objetivo));
@@ -335,13 +337,17 @@ export function bodega(pedidos, movimientos, proxima, objetivo) {
   const desde = pedidos.filter((p) => p.fechaEntrega && p.fechaEntrega >= inicio);
   const recibidos = sumar(movs.filter(esRecibido), (m) => m.paquetes);
   const ajustes = sumar(movs.filter((m) => m.motivo === "ajuste"), (m) => m.paquetes);
+  // Lo entregado sale de la bodega, esté pagado o no
   const entregados = sumar(desde.filter((p) => p.entregado), (p) => p.paquetes);
-  const enBodega = recibidos + ajustes - entregados;
+  // Pedidos de antes de la bodega que no se han entregado: se produjeron uno por uno (ya están en la
+  // cuenta con la fábrica) y siguen en su poder, así que cuentan en la bodega y en lo que falta entregar
+  const deAntes = sumar(pedidos.filter((p) => seProduce(p) && !p.entregado && p.fechaEntrega && p.fechaEntrega < inicio), (p) => p.paquetes);
+  const enBodega = recibidos + ajustes - entregados + deAntes;
   // Lo que falta entregar hasta la próxima entrega (incluye viernes pasados sin entregar)
-  const pendientes = sumar(desde.filter((p) => !p.entregado && p.fechaEntrega <= proxima), (p) => p.paquetes);
+  const pendientes = deAntes + sumar(desde.filter((p) => seProduce(p) && !p.entregado && p.fechaEntrega <= proxima), (p) => p.paquetes);
   const quedan = enBodega - pendientes;
   return {
-    activa: true, inicio, recibidos, ajustes, entregados, enBodega, pendientes, quedan,
+    activa: true, inicio, recibidos, ajustes, entregados, deAntes, enBodega, pendientes, quedan,
     faltan: Math.max(0, -quedan), objetivo: obj, sugerido: Math.max(0, obj - quedan), movs
   };
 }

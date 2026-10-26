@@ -402,10 +402,11 @@
   <dialog id="d-bodega" class="dialogo">
     <form method="dialog" id="f-bodega" class="form">
       <h2 class="dialogo-t" id="bd-titulo">Recibimos de la fábrica</h2>
+      <p class="bodega-alerta" id="bd-aviso" hidden></p>
       <label class="etq"><span id="bd-paq-t">Paquetes recibidos</span>
         <input class="campo" id="bd-paq" type="number" inputmode="numeric" min="0" step="1" required>
       </label>
-      <label class="etq">Fecha <input class="campo" id="bd-fecha" type="date" required></label>
+      <label class="etq" id="bd-fecha-l">Fecha <input class="campo" id="bd-fecha" type="date" required></label>
       <label class="check" id="bd-fabrica-l" hidden><input type="checkbox" id="bd-fabrica" checked> <span id="bd-fabrica-t"></span></label>
       <label class="etq">Nota <input class="campo" id="bd-desc" placeholder="Opcional"></label>
       <p class="nota" id="bd-ayuda"></p>

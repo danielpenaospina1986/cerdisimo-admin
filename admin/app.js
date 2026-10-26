@@ -4,7 +4,7 @@ import {
   fechaLarga, fechaCorta, nombreMes, plata, leerPlata, resumenMes, saldos,
   enlaceGoogle, enlaceApple, enlaceWhatsApp, ordenarDesdeElNorte, ordenDeReparto, enlaceRutaGoogle,
   necesidadesEntrega, viernesConPedidos, ESTADOS, venceAlCorte, pasoElCorte, codigoPedido, saldoNequi, cuentaFabrica,
-  bodega, promedioEntregas,
+  bodega, promedioEntregas, inicioBodega,
   TODOS_PRODUCTOS, CHORIPANES, EVENTO, esDelEvento, resumenEvento, RECETA_CHORIPAN, cantidadReceta
 } from "../negocio.js";
 
@@ -311,7 +311,9 @@ document.addEventListener("click", async (e) => {
     const m = datos.movimientos.find((x) => x.id === id);
     const que = !m ? "este movimiento de bodega"
       : (m.motivo === "ajuste" ? "el ajuste de conteo (" + conSigno(m.paquetes) + " paq.)" : "los " + paqTxt(Number(m.paquetes) || 0) + " recibidos") + " del " + fechaCorta(m.fecha);
-    if (confirm("¿Borrar " + que + "? No se puede deshacer.")) await store.borrar("movimientos", id);
+    const antes = inicioBodega(datos.movimientos);
+    const despues = inicioBodega(datos.movimientos.filter((x) => x.id !== id));
+    if (confirm("¿Borrar " + que + "? No se puede deshacer." + (antes !== despues ? "\n\n" + avisoInicio(antes, despues) : ""))) await store.borrar("movimientos", id);
   }
   if (b.dataset.acc === "editar-mov") {
     const m = datos.movimientos.find((x) => x.id === id);
@@ -921,8 +923,13 @@ function pintarNequiYFabrica(s) {
     fila("Gastos (gasolina y otros)", "−" + plata(n.gastos), "menos") +
     fila("Liquidado a los socios", "−" + plata(n.liquidado), "menos") +
     fila("Inversiones", "−" + plata(n.invertido), "menos");
+  // Lo que se debe por paquetes que siguen en bodega todavía no se ha cobrado: no está en Nequi
+  const b = estadoBodega();
+  const costo = precios(datos).costoPaquete;
+  const enBodegaDebidos = b.activa ? Math.min(f.deben, Math.max(0, b.enBodega)) : 0;
   $("#c-nequi-nota").textContent = "Desde el primer pedido, suponiendo que toda la plata entra y sale por Nequi. De esa plata, " +
-    plata(Math.max(0, s.saldoFondo)) + " son del fondo de gasolina y " + plata(f.debePlata) + " es lo que le debemos a la fábrica.";
+    plata(Math.max(0, s.saldoFondo)) + " son del fondo de gasolina y " + plata((f.deben - enBodegaDebidos) * costo) + " es lo que le debemos a la fábrica por lo ya vendido." +
+    (enBodegaDebidos ? " Además le debemos " + plata(enBodegaDebidos * costo) + " por " + paqTxt(enBodegaDebidos) + " que siguen en bodega; esa plata entra cuando se vendan." : "");
 
   const paq = (x) => x + " paq.";
   const hasta = (d) => fechaCorta(d).replace(/ \d{4}$/, "");
@@ -1257,22 +1264,38 @@ function pintarProduccion() {
 // Lo que tienen en su poder: sube con «Recibimos de la fábrica» y baja al marcar pedidos entregados.
 // Avisa si no alcanza para la próxima entrega y sugiere cuánto pedir para quedar con el objetivo.
 const objetivoBodega = () => (datos.config.find((c) => c.id === "inventario") || {}).objetivo;
-const estadoBodega = () => bodega(normales().filter(confirmado), datos.movimientos, viernesActual(), objetivoBodega());
+const estadoBodega = () => bodega(normales(), datos.movimientos, viernesActual(), objetivoBodega());
+// Cuando un cambio mueve el día en que empezó la bodega
+const avisoInicio = (antes, despues) => !despues
+  ? "Ojo: sin recibidos, la app vuelve a contar lo de la fábrica pedido por pedido, como antes de la bodega. ¿Seguir?"
+  : "Ojo: la bodega pasaría a empezar el " + fechaCorta(despues) + " (hoy empieza el " + fechaCorta(antes) + "). Eso cambia qué pedidos salen de la bodega y lo que le debemos a la fábrica. ¿Seguir?";
 const paqTxt = (n) => (n < 0 ? "−" : "") + Math.abs(n) + " " + (Math.abs(n) === 1 ? "paquete" : "paquetes");
 const conSigno = (n) => (Number(n) > 0 ? "+" : Number(n) < 0 ? "−" : "") + Math.abs(Number(n) || 0);
 
-// Aviso arriba en toda la app (menos en Producción, que tiene el suyo) cuando la bodega no alcanza
-function pintarAvisoBodega() {
-  const b = estadoBodega();
-  const a = $("#aviso-bodega");
-  a.hidden = !b.activa || !b.faltan || ui.vista === "produccion";
-  a.textContent = a.hidden ? "" : "⚠ Faltan " + paqTxt(b.faltan) + " en bodega para el " + fechaLarga(viernesActual()) + ". Pidan a la fábrica (ver Producción).";
+// Qué dice la alerta de la bodega, o "" si todo está bien. Si la app da menos de 0 en bodega (no puede
+// ser), casi siempre es porque se entregaron paquetes que no salieron de la bodega (los que uno de los
+// dos recogió directo en la fábrica): primero hay que contar, no pedir.
+function alertaBodega(b, larga) {
+  if (!b.activa) return "";
+  if (b.enBodega < 0) return "La app dice " + paqTxt(b.enBodega) + " en bodega" + (larga ? ", y eso no puede ser" : "") +
+    ": cuenten la bodega y toquen «Corregir conteo» antes de pedir a la fábrica.";
+  if (b.faltan) return "Faltan " + paqTxt(b.faltan) + " para el " + fechaLarga(viernesActual()) + ". Pidan a la fábrica" + (larga ? " ya." : ".");
+  return "";
 }
-$("#aviso-bodega").addEventListener("click", () => $('.pestanas button[data-vista="produccion"]').click());
+// Aviso arriba en toda la app; al tocarlo lleva a la tarjeta de la bodega en Producción
+function pintarAvisoBodega() {
+  const t = alertaBodega(estadoBodega());
+  const a = $("#aviso-bodega");
+  a.hidden = !t;
+  a.textContent = t ? "⚠ Bodega: " + t : "";
+}
+$("#aviso-bodega").addEventListener("click", () => {
+  $('.pestanas button[data-vista="produccion"]').click();
+  $("#pr-bodega").scrollIntoView({ behavior: "smooth", block: "start" });
+});
 
 function pintarBodega() {
   const b = estadoBodega();
-  const dia = fechaLarga(viernesActual());
   const diaCorto = fechaCorta(viernesActual()).replace(/ \d{4}$/, "");
   $("#btn-conteo").hidden = !b.activa;
   $("#btn-objetivo").textContent = "Cambiar los " + b.objetivo;
@@ -1285,18 +1308,20 @@ function pintarBodega() {
   } else {
     const f = fabrica();
     const prom = promedioEntregas(normales().filter(confirmado), viernesFabrica());
-    alerta.hidden = !b.faltan;
-    alerta.textContent = b.faltan ? "Faltan " + paqTxt(b.faltan) + " para el " + dia + ". Pidan a la fábrica ya." : "";
+    const t = alertaBodega(b, true);
+    alerta.hidden = !t;
+    alerta.textContent = t;
+    const cuadra = b.enBodega >= 0;
     $("#pr-bodega-n").textContent = paqTxt(b.enBodega);
     $("#pr-bodega-det").innerHTML =
-      fila("Por entregar hasta el " + diaCorto, "−" + paqTxt(b.pendientes), "menos") +
+      fila("Por entregar hasta el " + diaCorto, (b.pendientes ? "−" : "") + paqTxt(b.pendientes), "menos") +
       fila("Quedan después de entregar", paqTxt(b.quedan), "suma") +
-      fila("Sugerido pedir a la fábrica", paqTxt(b.sugerido)) +
+      fila("Sugerido pedir a la fábrica", cuadra ? paqTxt(b.sugerido) : "Primero cuenten") +
       (prom.semanas.length ? fila("Promedio de " + plural(prom.semanas.length, "la última entrega", "las últimas " + prom.semanas.length + " entregas"),
         prom.promedio.toLocaleString("es-CO", { maximumFractionDigits: 1 }) + " paq.") : "") +
       fila("Debemos a la fábrica", paqTxt(f.deben) + "<br>" + plata(f.debePlata));
     // Pedidos de la app que todavía esperan pago: no cuentan hasta que Mariana los apruebe
-    const espera = normales().filter((p) => esWeb(p) && !p.pagado && (p.estado === "por_pagar" || p.estado === "por_verificar") &&
+    const espera = normales().filter((p) => esWeb(p) && !p.pagado && !p.entregado && (p.estado === "por_pagar" || p.estado === "por_verificar") &&
       p.fechaEntrega >= b.inicio && p.fechaEntrega <= viernesActual()).reduce((t, p) => t + (Number(p.paquetes) || 0), 0);
     $("#pr-bodega-nota").textContent = "Sugerido: lo que hay que pedir para quedar con " + paqTxt(b.objetivo) + " después de entregar. " +
       (espera ? "Hay " + paqTxt(espera) + " más en pedidos de la app esperando pago; si se aprueban, quedarían " + paqTxt(b.quedan - espera) + ". " : "") +
@@ -1322,7 +1347,7 @@ $("#btn-recibido").addEventListener("click", () => abrirBodega("recibido"));
 $("#btn-conteo").addEventListener("click", () => abrirBodega("ajuste"));
 $("#btn-objetivo").addEventListener("click", async () => {
   const r = prompt("¿Con cuántos paquetes quieren quedar en bodega después de cada entrega?", String(estadoBodega().objetivo));
-  if (r === null) return;
+  if (r === null || !String(r).trim()) return;
   const n = Number(String(r).trim());
   if (!Number.isInteger(n) || n < 0) { alert("Escribe un número entero de paquetes."); return; }
   try { await store.fijar("config", "inventario", { objetivo: n }); }
@@ -1340,6 +1365,10 @@ function abrirBodega(modo, mov) {
   $("#bd-paq").min = conteo ? "0" : "1";
   $("#bd-paq").value = mov ? Number(mov.paquetes) || "" : "";
   $("#bd-fecha").value = mov ? mov.fecha || hoyISO() : hoyISO();
+  $("#bd-fecha").max = hoyISO();
+  // El conteo es de hoy: la diferencia se saca contra lo que dice la app en este momento
+  $("#bd-fecha-l").hidden = conteo;
+  $("#bd-fecha").disabled = conteo;
   $("#bd-desc").value = mov ? mov.descripcion || "" : "";
   $("#bd-desc").placeholder = conteo ? "Ej.: 2 regalados en el concurso" : "Opcional";
   $("#bd-fabrica").checked = true;
@@ -1360,14 +1389,22 @@ function difConteo() {
 function formaBodega() {
   const conteo = modoBodega === "ajuste";
   const d = conteo ? difConteo() : null;
+  const costo = precios(datos).costoPaquete;
   $("#bd-fabrica-l").hidden = !(d > 0);
-  if (d > 0) $("#bd-fabrica-t").textContent = d === 1
-    ? "El paquete de más llegó de la fábrica sin registrar: se suma a lo que le debemos."
-    : "Los " + d + " paquetes de más llegaron de la fábrica sin registrar: se suman a lo que le debemos.";
+  if (d > 0) $("#bd-fabrica-t").textContent = (d === 1
+    ? "El paquete de más llegó de la fábrica sin registrar: se suma"
+    : "Los " + d + " paquetes de más llegaron de la fábrica sin registrar: se suman") +
+    " a lo que le debemos (" + plata(d * costo) + ").";
+  // Si ya salieron pedidos que no se han marcado como entregados, el conteo da menos y luego descuadra
+  const b = estadoBodega();
+  const sinMarcar = conteo && b.activa ? normales().filter((p) => (confirmado(p) || p.estado === "por_pagar" || p.estado === "por_verificar") &&
+    !p.entregado && p.fechaEntrega && p.fechaEntrega <= hoyISO()).reduce((t, p) => t + (Number(p.paquetes) || 0), 0) : 0;
+  $("#bd-aviso").hidden = !sinMarcar;
+  $("#bd-aviso").textContent = sinMarcar ? "Ojo: hay " + paqTxt(sinMarcar) + " en pedidos de hoy o de antes sin marcar como entregados. Si ya salieron, márquenlos en Entregas antes de contar." : "";
   $("#bd-ayuda").textContent = !conteo
-    ? "Suben la bodega y lo que le debemos a la fábrica (" + plata(precios(datos).costoPaquete) + " por paquete)." +
-      (estadoBodega().activa ? "" : " Desde este día los pedidos salen de la bodega.")
-    : "Según la app hay " + paqTxt(estadoBodega().enBodega) + "." +
+    ? "Se suman a la bodega y a lo que le debemos a la fábrica (" + plata(costo) + " por paquete)." +
+      (b.activa ? "" : " Desde este día los pedidos salen de la bodega.")
+    : "Según la app hay " + paqTxt(b.enBodega) + "." +
       (d === null ? "" : d === 0 ? " Coincide." : d < 0 ? " Faltan " + paqTxt(-d) + ": se descuentan de la bodega sin cambiar lo que le debemos a la fábrica."
         : $("#bd-fabrica").checked ? "" : " Sobran " + paqTxt(d) + ": se suman a la bodega sin cambiar lo que le debemos a la fábrica.");
 }
@@ -1383,7 +1420,14 @@ $("#f-bodega").addEventListener("submit", async (e) => {
     $("#bd-error").textContent = conteo ? "Escribe cuántos paquetes hay." : "Escribe cuántos paquetes recibieron.";
     return;
   }
-  const mov = { tipo: "bodega", motivo: modoBodega, fecha: $("#bd-fecha").value, descripcion: $("#bd-desc").value.trim() };
+  const mov = { tipo: "bodega", motivo: modoBodega, fecha: conteo ? hoyISO() : $("#bd-fecha").value, descripcion: $("#bd-desc").value.trim() };
+  if (mov.fecha > hoyISO()) { $("#bd-error").textContent = "La fecha no puede ser después de hoy."; return; }
+  // Corregir la fecha del primer recibido cambia desde qué día los pedidos salen de la bodega
+  if (bodegaEditada) {
+    const antes = inicioBodega(datos.movimientos);
+    const despues = inicioBodega(datos.movimientos.map((m) => (m.id === bodegaEditada.id ? { ...m, ...mov } : m)));
+    if (antes !== despues && !confirm(avisoInicio(antes, despues))) return;
+  }
   if (conteo) {
     const dif = n - estadoBodega().enBodega;
     if (!dif) { $("#bd-error").textContent = "El conteo coincide con la app: no hay nada que corregir."; return; }
