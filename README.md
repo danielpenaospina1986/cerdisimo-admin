@@ -43,16 +43,16 @@ Con la cuenta de Google dueña del proyecto de Firebase:
 
 El script lee Firestore con los permisos de esa cuenta (no pasa por `firestore.rules`) y recuerda qué pagos ya avisó. Google deja mandar unos 100 correos al día desde una cuenta Gmail; si se acaba el cupo, avisa al día siguiente y la campanita sigue funcionando.
 
-## Preventa de la chorizada en Dogstar (20 de noviembre de 2026)
+## La Chorizada Real: preventa del evento en Dogstar (20 de noviembre de 2026)
 
-- En la tienda, arriba de los chorizos, sale la tarjeta **Chorizada en Dogstar**: el cliente elige cuántos choripanes quiere ($10.000 cada uno en preventa; en la carpa valen $12.000), paga por Nequi como siempre y lo reclama en la carpa mostrando su código.
-- La preventa cierra con el corte de siempre: jueves 19 de noviembre a las 12 m. Lo que no se pague para entonces se cancela solo.
+- En la tienda, arriba de los chorizos, sale la tarjeta **La Chorizada Real**: el cliente elige cuántos choripanes quiere ($10.000 cada uno en preventa; en la carpa valen $12.000), paga por Nequi como siempre y lo reclama en la carpa mostrando su código.
+- La preventa cierra el sábado 14 de noviembre a las 11:59 p. m., para tener la semana del evento para producir. Lo que no se pague para entonces se cancela solo. La fecha está en `EVENTO.cierre` de `negocio.js`.
 - En la administración el evento tiene su propia pestaña, **Dogstar**, aparte de Entregas, Producción y la cuenta con la fábrica:
   - **Preventas**: quién compró, con buscador por nombre o código, para ir entregando en la carpa (de a uno o todos). El cliente ve en su app "Entregado en parte" o "Entregado".
   - **Ventas en la carpa**: se anotan con cuántos choripanes y si pagaron por Nequi o en efectivo. Lo de efectivo no se suma a lo que debe haber en Nequi.
   - **Lo que hay que llevar**: chorizos, panes, salsas, carbón, servilletas y papel según los choripanes planeados (por defecto 125).
   - **Cuentas del evento**: ventas menos las compras del evento = ganancia del evento.
-  - **Compras del evento**: se registran como inversiones con la casilla «Es para la chorizada en Dogstar» (desde el botón de la pestaña o desde Contabilidad). En Contabilidad salen con las demás inversiones, marcadas «Dogstar», y la lista se puede filtrar: todas, solo Dogstar o sin Dogstar.
+  - **Compras del evento**: se registran como inversiones con la casilla «Es para La Chorizada Real (Dogstar)» (desde el botón de la pestaña o desde Contabilidad). En Contabilidad salen con las demás inversiones, marcadas «Dogstar», y la lista se puede filtrar: todas, solo Dogstar o sin Dogstar.
 - Precios y costo por choripán (pan, salsas y carbón, sin el chorizo) se cambian en Contabilidad → Precios y costos. Datos del evento en `EVENTO` de `negocio.js`.
 
 ## Reglas de negocio (de la calculadora "Ganancias por pedido")
