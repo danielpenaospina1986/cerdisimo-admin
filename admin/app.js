@@ -856,7 +856,7 @@ function pintarContabilidad() {
   // Todas las inversiones (de todo el tiempo), la más reciente primero, para corregirlas o borrarlas
   const todasInv = datos.movimientos.filter((m) => m.tipo === "inversion");
   const delEvento = todasInv.filter(esDelEvento).reduce((t, m) => t + (Number(m.monto) || 0), 0);
-  $("#c-inv-evento").textContent = delEvento ? "De eso, " + plata(delEvento) + " son compras de la chorizada en Dogstar." : "";
+  $("#c-inv-evento").textContent = delEvento ? "De eso, " + plata(delEvento) + " son compras de La Chorizada Real (Dogstar)." : "";
   const filtro = $("#c-inv-filtro").value;
   const invs = todasInv.filter((m) => filtro === "todas" || (filtro === "evento") === esDelEvento(m))
     .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "") || (b.creado || "").localeCompare(a.creado || ""));

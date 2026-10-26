@@ -29,7 +29,7 @@ export const PRODUCTOS = [
 // no se cuentan en paquetes: cada uno lleva un chorizo suelto, más el pan y las salsas.
 export const EVENTO = {
   id: "dogstar-2026-11",
-  nombre: "Chorizada en Dogstar",
+  nombre: "La Chorizada Real", // nombre del evento (Daniel, 26 oct)
   fecha: "2026-11-20",
   lugar: "Dogstar, Medellín",
   desde: "6:30 p. m.",

@@ -206,7 +206,7 @@ function pintarEvento() {
   $("#f-evento").hidden = !abierta;
   if (!abierta) return;
   const p = P();
-  $("#evento-cuando").innerHTML = "<strong>" + fechaLarga(EVENTO.fecha).replace(/^./, (c) => c.toUpperCase()) + "</strong>, de " + EVENTO.horario +
+  $("#evento-cuando").innerHTML = "En " + EVENTO.lugar + ". <strong>" + fechaLarga(EVENTO.fecha).replace(/^./, (c) => c.toUpperCase()) + "</strong>, de " + EVENTO.horario +
     " Cierre de año y apertura de la temporada navideña. La preventa va hasta el " + fechaLarga(EVENTO.cierre) + " " + EVENTO.cierreTexto;
   $("#evento-precio").textContent = plata(p.precioChoripan);
   $("#evento-sitio").textContent = p.precioChoripanSitio > p.precioChoripan ? "(en la carpa vale " + plata(p.precioChoripanSitio) + ")" : "";
