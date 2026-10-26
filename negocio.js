@@ -208,14 +208,19 @@ export function saldoNequi(datos) {
 }
 
 // Cuenta con la fábrica de chorizos. Pedidos a la fábrica = los paquetes de los pedidos que se
-// producen (`pedidos` ya viene filtrado a los confirmados) con entrega hasta el viernes `hasta`.
+// producen (`pedidos` ya viene filtrado a los confirmados) con entrega hasta el viernes `hasta`,
+// y desde que hay bodega, lo recibido para la bodega (ver bodega()).
 // Pagados = los paquetes de los pagos a la fábrica. Se le paga por cortes (cada 15 o 20 días, lo que
 // se deba hasta ese día), así que es una sola cuenta corrida: lo pedido menos lo pagado.
 export function cuentaFabrica(pedidos, movimientos, hasta, costoPaquete) {
-  const pedidosFabrica = pedidos.reduce((t, p) => {
+  const inicio = inicioBodega(movimientos);
+  // Antes de la bodega cada pedido se producía aparte; desde que hay bodega, cuenta lo recibido
+  const porPedido = pedidos.reduce((t, p) => {
     const n = Number(p.paquetes) || 0;
-    return p.fechaEntrega && p.fechaEntrega <= hasta && n > 0 ? t + n : t;
+    return p.fechaEntrega && p.fechaEntrega <= hasta && (!inicio || p.fechaEntrega < inicio) && n > 0 ? t + n : t;
   }, 0);
+  const recibidos = sumar(movimientos.filter(esRecibido), (m) => m.paquetes);
+  const pedidosFabrica = porPedido + recibidos;
   const pagos = movimientos
     .filter((m) => m.tipo === "proveedor" && Number(m.paquetes) > 0)
     .map((m) => ({ id: m.id, tipo: m.tipo, fecha: m.fecha || "", paquetes: Number(m.paquetes), monto: Number(m.monto) || 0, descripcion: m.descripcion || "", creado: m.creado || "" }))
@@ -223,7 +228,7 @@ export function cuentaFabrica(pedidos, movimientos, hasta, costoPaquete) {
   const pagados = pagos.reduce((t, m) => t + m.paquetes, 0);
   const deben = Math.max(0, pedidosFabrica - pagados);
   return {
-    pedidos: pedidosFabrica, pagados, deben, debePlata: deben * (Number(costoPaquete) || 0),
+    pedidos: pedidosFabrica, porPedido, recibidos, inicio, pagados, deben, debePlata: deben * (Number(costoPaquete) || 0),
     adelantados: Math.max(0, pagados - pedidosFabrica), pagadoPlata: pagos.reduce((t, m) => t + m.monto, 0), pagos
   };
 }
@@ -302,6 +307,57 @@ export function enlaceRutaGoogle(ruta) {
 
 // ---------- Inventario / producción ----------
 export const CHORIZOS_POR_PAQUETE = 5;
+
+// ---------- Bodega de chorizos ----------
+// Desde octubre de 2026 la fábrica les deja paquetes para tener en bodega, y se le deben hasta que
+// se paguen. Los pedidos salen de la bodega y a la fábrica se le pide para reponerla.
+// La bodega empieza con el primer «Recibimos de la fábrica» (movimiento tipo "bodega"): los pedidos
+// con entrega desde ese día salen de la bodega cuando se marcan como entregados. Los de antes se
+// produjeron pedido por pedido. Un «Corregir conteo» (motivo "ajuste") cambia lo que hay en bodega
+// sin cambiar lo que se le debe a la fábrica.
+export const STOCK_OBJETIVO = 25;
+const sumar = (arr, f) => arr.reduce((t, x) => t + (Number(f(x)) || 0), 0);
+const esBodega = (m) => m.tipo === "bodega";
+const esRecibido = (m) => esBodega(m) && m.motivo !== "ajuste";
+
+export function inicioBodega(movimientos) {
+  return movimientos.filter(esRecibido).map((m) => m.fecha).filter(Boolean).sort()[0] || null;
+}
+
+// `pedidos`: los que se producen (confirmados, sin los del evento). `proxima`: viernes de la próxima
+// entrega. `objetivo`: los paquetes que quieren tener en bodega después de cada entrega.
+export function bodega(pedidos, movimientos, proxima, objetivo) {
+  const movs = movimientos.filter(esBodega).slice()
+    .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "") || (b.creado || "").localeCompare(a.creado || ""));
+  const obj = objetivo === "" || objetivo == null || !(Number(objetivo) >= 0) ? STOCK_OBJETIVO : Math.round(Number(objetivo));
+  const inicio = inicioBodega(movimientos);
+  if (!inicio) return { activa: false, movs, objetivo: obj };
+  const desde = pedidos.filter((p) => p.fechaEntrega && p.fechaEntrega >= inicio);
+  const recibidos = sumar(movs.filter(esRecibido), (m) => m.paquetes);
+  const ajustes = sumar(movs.filter((m) => m.motivo === "ajuste"), (m) => m.paquetes);
+  const entregados = sumar(desde.filter((p) => p.entregado), (p) => p.paquetes);
+  const enBodega = recibidos + ajustes - entregados;
+  // Lo que falta entregar hasta la próxima entrega (incluye viernes pasados sin entregar)
+  const pendientes = sumar(desde.filter((p) => !p.entregado && p.fechaEntrega <= proxima), (p) => p.paquetes);
+  const quedan = enBodega - pendientes;
+  return {
+    activa: true, inicio, recibidos, ajustes, entregados, enBodega, pendientes, quedan,
+    faltan: Math.max(0, -quedan), objetivo: obj, sugerido: Math.max(0, obj - quedan), movs
+  };
+}
+
+// Paquetes por entrega en las últimas `n` entregas con pedidos, hasta el viernes `hasta` (incluido).
+// Mira hasta 8 viernes atrás.
+export function promedioEntregas(pedidos, hasta, n = 4) {
+  const semanas = [];
+  for (let i = 0; i < 8 && semanas.length < n; i++) {
+    const v = sumarDias(hasta, -7 * i);
+    const paq = sumar(pedidos.filter((p) => p.fechaEntrega === v), (p) => p.paquetes);
+    if (paq > 0) semanas.push({ viernes: v, paquetes: paq });
+  }
+  const total = sumar(semanas, (x) => x.paquetes);
+  return { semanas, promedio: semanas.length ? total / semanas.length : 0 };
+}
 
 // Lo que hay que tener listo para un viernes: todos sus pedidos (pagados o no, con domi o
 // para recoger). Si es la próxima entrega, suma también los pedidos de viernes anteriores

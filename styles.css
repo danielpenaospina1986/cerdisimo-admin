@@ -331,6 +331,12 @@ code { font-size: 0.9em; }
 .necesidad-unidad { margin: 4px 0 0; font: 800 17px/1.2 var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; }
 .necesidad-det { margin: 6px 0 0; font-size: 14px; font-weight: 700; color: #4a3a30; text-wrap: balance; }
 .necesidad-det:empty { display: none; }
+/* Bodega de chorizos (Producción) y su aviso arriba en toda la app */
+.bodega .cifra { margin-bottom: 8px; }
+.bodega-alerta { margin: 0 0 12px; padding: 10px 12px; background: var(--pendiente-fondo); color: var(--pendiente); border: var(--stroke-md) solid var(--ink); border-radius: var(--radius-md); font-weight: 800; }
+.botonera-izq { justify-content: flex-start; }
+.aviso-bodega { display: block; width: calc(100% - 32px); text-align: left; font: inherit; font-weight: 800; color: var(--pendiente); background: var(--pendiente-fondo); cursor: pointer; }
+@media (min-width: 1012px) { .aviso-bodega { width: 980px; } }
 .tabla tr.sel td { background: var(--mustard); }
 .tabla tr[data-viernes]:focus-visible { outline: 3px solid var(--rust-deep); outline-offset: -3px; }
 .tabla tr.suma td { font-weight: 800; border-top: var(--stroke-md) solid var(--ink); }

@@ -33,6 +33,8 @@
     </nav>
   </header>
 
+  <button type="button" class="aviso aviso-bodega" id="aviso-bodega" hidden></button>
+
   <p class="aviso" id="aviso-prueba" hidden>Modo prueba: los datos se guardan solo en este navegador. Pega la configuración de Firebase en <code>firebase-config.js</code> para usar la base de datos compartida.</p>
 
   <main>
@@ -187,6 +189,24 @@
       </div>
       <div class="chips" id="pr-avance"></div>
       <p class="nota" id="pr-nota"></p>
+
+      <!-- Bodega: lo que tienen en su poder (se le debe a la fábrica hasta que se pague) -->
+      <article class="tarjeta bodega" id="pr-bodega">
+        <h2 class="subtitulo">Hoy en bodega</h2>
+        <p class="bodega-alerta" id="pr-bodega-alerta" hidden></p>
+        <p class="cifra" id="pr-bodega-n">0 paquetes</p>
+        <dl class="cuentas" id="pr-bodega-det"></dl>
+        <p class="nota" id="pr-bodega-nota"></p>
+        <div class="botonera botonera-izq">
+          <button class="btn btn-sec" id="btn-recibido">Recibimos de la fábrica</button>
+          <button class="btn btn-sec" id="btn-conteo">Corregir conteo</button>
+          <button class="btn btn-sec btn-chico" id="btn-objetivo">Cambiar los 25</button>
+        </div>
+        <details class="cortes" id="pr-bodega-caja">
+          <summary id="pr-bodega-resumen">Movimientos de bodega</summary>
+          <div class="tabla-caja"><table class="tabla" id="pr-bodega-movs"></table></div>
+        </details>
+      </article>
 
       <h2 class="seccion">Qué pidieron</h2>
       <div class="tabla-caja"><table class="tabla" id="pr-desglose"></table></div>
@@ -375,6 +395,24 @@
       <div class="botonera">
         <button class="btn btn-sec" value="cancelar" formnovalidate>Cancelar</button>
         <button class="btn" value="guardar" id="m-guardar">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="d-bodega" class="dialogo">
+    <form method="dialog" id="f-bodega" class="form">
+      <h2 class="dialogo-t" id="bd-titulo">Recibimos de la fábrica</h2>
+      <label class="etq"><span id="bd-paq-t">Paquetes recibidos</span>
+        <input class="campo" id="bd-paq" type="number" inputmode="numeric" min="0" step="1" required>
+      </label>
+      <label class="etq">Fecha <input class="campo" id="bd-fecha" type="date" required></label>
+      <label class="check" id="bd-fabrica-l" hidden><input type="checkbox" id="bd-fabrica" checked> <span id="bd-fabrica-t"></span></label>
+      <label class="etq">Nota <input class="campo" id="bd-desc" placeholder="Opcional"></label>
+      <p class="nota" id="bd-ayuda"></p>
+      <p class="error" id="bd-error"></p>
+      <div class="botonera">
+        <button class="btn btn-sec" value="cancelar" formnovalidate>Cancelar</button>
+        <button class="btn" value="guardar" id="bd-guardar">Guardar</button>
       </div>
     </form>
   </dialog>

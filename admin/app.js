@@ -4,6 +4,7 @@ import {
   fechaLarga, fechaCorta, nombreMes, plata, leerPlata, resumenMes, saldos,
   enlaceGoogle, enlaceApple, enlaceWhatsApp, ordenarDesdeElNorte, ordenDeReparto, enlaceRutaGoogle,
   necesidadesEntrega, viernesConPedidos, ESTADOS, venceAlCorte, pasoElCorte, codigoPedido, saldoNequi, cuentaFabrica,
+  bodega, promedioEntregas,
   TODOS_PRODUCTOS, CHORIPANES, EVENTO, esDelEvento, resumenEvento, RECETA_CHORIPAN, cantidadReceta
 } from "../negocio.js";
 
@@ -92,6 +93,7 @@ function pintar() {
   if (ui.vista === "clientes") pintarClientes();
   if (ui.vista === "produccion") pintarProduccion();
   if (ui.vista === "evento") pintarEvento();
+  pintarAvisoBodega();
 }
 
 const cliente = (id) => datos.clientes.find((c) => c.id === id);
@@ -299,6 +301,16 @@ document.addEventListener("click", async (e) => {
   if (b.dataset.acc === "borrar-mov") {
     const m = datos.movimientos.find((x) => x.id === id);
     const que = m ? [NOMBRE_MOV[m.tipo], ...detalleMov(m), plata(m.monto), fechaCorta(m.fecha)].filter(Boolean).join(" · ") : "este movimiento";
+    if (confirm("¿Borrar " + que + "? No se puede deshacer.")) await store.borrar("movimientos", id);
+  }
+  if (b.dataset.acc === "editar-bodega") {
+    const m = datos.movimientos.find((x) => x.id === id);
+    if (m && m.motivo !== "ajuste") abrirBodega("recibido", m);
+  }
+  if (b.dataset.acc === "borrar-bodega") {
+    const m = datos.movimientos.find((x) => x.id === id);
+    const que = !m ? "este movimiento de bodega"
+      : (m.motivo === "ajuste" ? "el ajuste de conteo (" + conSigno(m.paquetes) + " paq.)" : "los " + paqTxt(Number(m.paquetes) || 0) + " recibidos") + " del " + fechaCorta(m.fecha);
     if (confirm("¿Borrar " + que + "? No se puede deshacer.")) await store.borrar("movimientos", id);
   }
   if (b.dataset.acc === "editar-mov") {
@@ -874,7 +886,8 @@ function pintarContabilidad() {
       fila("Invertido en el negocio", "−" + plata(x.invertido), "menos") + fila("Disponible", plata(x.disponible), "suma") + "</dl></div>";
   }).join("");
 
-  const movs = datos.movimientos.filter((m) => (m.fecha || "").startsWith(ui.mes)).sort((a, b) => b.fecha.localeCompare(a.fecha));
+  // Solo los movimientos de plata: los de la bodega (paquetes) están en Producción
+  const movs = datos.movimientos.filter((m) => NOMBRE_MOV[m.tipo] && (m.fecha || "").startsWith(ui.mes)).sort((a, b) => b.fecha.localeCompare(a.fecha));
   // El tipo va dentro del detalle (sin columna aparte) para que ✎ y ✕ quepan en un celular de 360 px
   $("#c-movs").innerHTML = "<thead><tr><th>Fecha</th><th>Detalle</th><th class=num>Monto</th><th></th></tr></thead><tbody>" +
     (movs.length ? movs.map((m) => "<tr><td>" + fechaCorta(m.fecha) + "</td><td><strong>" + NOMBRE_MOV[m.tipo] + "</strong>" +
@@ -912,8 +925,11 @@ function pintarNequiYFabrica(s) {
     plata(Math.max(0, s.saldoFondo)) + " son del fondo de gasolina y " + plata(f.debePlata) + " es lo que le debemos a la fábrica.";
 
   const paq = (x) => x + " paq.";
+  const hasta = (d) => fechaCorta(d).replace(/ \d{4}$/, "");
   $("#c-fabrica").innerHTML =
-    fila("Pedidos a la fábrica (hasta el " + fechaCorta(viernesFabrica()).replace(/ \d{4}$/, "") + ")", paq(f.pedidos)) +
+    (f.inicio
+      ? fila("Producidos por pedido (antes de la bodega)", paq(f.porPedido)) + fila("Recibidos de la fábrica (desde el " + hasta(f.inicio) + ")", paq(f.recibidos))
+      : fila("Pedidos a la fábrica (hasta el " + hasta(viernesFabrica()) + ")", paq(f.pedidos))) +
     fila("Pagados", paq(f.pagados), "menos") +
     fila("Debemos", paq(f.deben), "suma") +
     fila("Valor de lo que debemos", plata(f.debePlata)) +
@@ -1225,6 +1241,8 @@ function pintarProduccion() {
         '<tr class="suma"><td>Total</td><td></td><td class="num">' + n.paquetes + '</td><td class="num">' + n.litros + "</td></tr>"
       : '<tr class="vacia"><td colspan="4">Sin pedidos para este viernes.</td></tr>') + "</tbody>";
 
+  pintarBodega();
+
   const viernes = viernesConPedidos(normales().filter(confirmado), proxima);
   if (!viernes.includes(proxima)) viernes.unshift(proxima);
   $("#pr-proximas").innerHTML = "<thead><tr><th>Viernes</th><th class=num>Pedidos</th><th class=num>Paquetes</th><th class=num>Litros</th></tr></thead><tbody>" +
@@ -1234,6 +1252,155 @@ function pintarProduccion() {
         '</td><td class="num">' + x.pedidos.length + '</td><td class="num">' + x.paquetes + '</td><td class="num">' + x.litros + "</td></tr>";
     }).join("") + "</tbody>";
 }
+
+// ---------- Bodega de chorizos ----------
+// Lo que tienen en su poder: sube con «Recibimos de la fábrica» y baja al marcar pedidos entregados.
+// Avisa si no alcanza para la próxima entrega y sugiere cuánto pedir para quedar con el objetivo.
+const objetivoBodega = () => (datos.config.find((c) => c.id === "inventario") || {}).objetivo;
+const estadoBodega = () => bodega(normales().filter(confirmado), datos.movimientos, viernesActual(), objetivoBodega());
+const paqTxt = (n) => (n < 0 ? "−" : "") + Math.abs(n) + " " + (Math.abs(n) === 1 ? "paquete" : "paquetes");
+const conSigno = (n) => (Number(n) > 0 ? "+" : Number(n) < 0 ? "−" : "") + Math.abs(Number(n) || 0);
+
+// Aviso arriba en toda la app (menos en Producción, que tiene el suyo) cuando la bodega no alcanza
+function pintarAvisoBodega() {
+  const b = estadoBodega();
+  const a = $("#aviso-bodega");
+  a.hidden = !b.activa || !b.faltan || ui.vista === "produccion";
+  a.textContent = a.hidden ? "" : "⚠ Faltan " + paqTxt(b.faltan) + " en bodega para el " + fechaLarga(viernesActual()) + ". Pidan a la fábrica (ver Producción).";
+}
+$("#aviso-bodega").addEventListener("click", () => $('.pestanas button[data-vista="produccion"]').click());
+
+function pintarBodega() {
+  const b = estadoBodega();
+  const dia = fechaLarga(viernesActual());
+  const diaCorto = fechaCorta(viernesActual()).replace(/ \d{4}$/, "");
+  $("#btn-conteo").hidden = !b.activa;
+  $("#btn-objetivo").textContent = "Cambiar los " + b.objetivo;
+  const alerta = $("#pr-bodega-alerta");
+  if (!b.activa) {
+    alerta.hidden = true;
+    $("#pr-bodega-n").textContent = "Sin registrar";
+    $("#pr-bodega-det").innerHTML = "";
+    $("#pr-bodega-nota").textContent = "Cuando la fábrica les entregue paquetes para tener en bodega, toquen «Recibimos de la fábrica». Desde ese día los pedidos salen de la bodega.";
+  } else {
+    const f = fabrica();
+    const prom = promedioEntregas(normales().filter(confirmado), viernesFabrica());
+    alerta.hidden = !b.faltan;
+    alerta.textContent = b.faltan ? "Faltan " + paqTxt(b.faltan) + " para el " + dia + ". Pidan a la fábrica ya." : "";
+    $("#pr-bodega-n").textContent = paqTxt(b.enBodega);
+    $("#pr-bodega-det").innerHTML =
+      fila("Por entregar hasta el " + diaCorto, "−" + paqTxt(b.pendientes), "menos") +
+      fila("Quedan después de entregar", paqTxt(b.quedan), "suma") +
+      fila("Sugerido pedir a la fábrica", paqTxt(b.sugerido)) +
+      (prom.semanas.length ? fila("Promedio de " + plural(prom.semanas.length, "la última entrega", "las últimas " + prom.semanas.length + " entregas"),
+        prom.promedio.toLocaleString("es-CO", { maximumFractionDigits: 1 }) + " paq.") : "") +
+      fila("Debemos a la fábrica", paqTxt(f.deben) + "<br>" + plata(f.debePlata));
+    // Pedidos de la app que todavía esperan pago: no cuentan hasta que Mariana los apruebe
+    const espera = normales().filter((p) => esWeb(p) && !p.pagado && (p.estado === "por_pagar" || p.estado === "por_verificar") &&
+      p.fechaEntrega >= b.inicio && p.fechaEntrega <= viernesActual()).reduce((t, p) => t + (Number(p.paquetes) || 0), 0);
+    $("#pr-bodega-nota").textContent = "Sugerido: lo que hay que pedir para quedar con " + paqTxt(b.objetivo) + " después de entregar. " +
+      (espera ? "Hay " + paqTxt(espera) + " más en pedidos de la app esperando pago; si se aprueban, quedarían " + paqTxt(b.quedan - espera) + ". " : "") +
+      "Los paquetes salen de la bodega cuando marcan el pedido como entregado.";
+  }
+  $("#pr-bodega-caja").hidden = !b.movs.length;
+  $("#pr-bodega-resumen").textContent = "Movimientos de bodega (" + b.movs.length + ")";
+  $("#pr-bodega-movs").innerHTML = "<thead><tr><th>Movimiento</th><th class=num>Paq.</th><th></th></tr></thead><tbody>" +
+    b.movs.map((m) => {
+      const aj = m.motivo === "ajuste";
+      const que = aj ? "Conteo" + (m.conteo != null ? ": había " + m.conteo : "")
+        : "Recibidos de la fábrica" + (m.conteo != null ? " (al contar había " + m.conteo + ")" : "");
+      return "<tr><td>" + fechaCorta(m.fecha) + '<br><span class="nota">' + que + (m.descripcion ? " · " + esc(m.descripcion) : "") +
+        '</span></td><td class="num">' + conSigno(m.paquetes) + '</td><td class="acciones">' +
+        (aj ? "" : '<button class="x lapiz" data-acc="editar-bodega" data-id="' + esc(m.id) + '" aria-label="Editar">✎</button>') +
+        '<button class="x" data-acc="borrar-bodega" data-id="' + esc(m.id) + '" aria-label="Borrar">✕</button></td></tr>';
+    }).join("") + "</tbody>";
+}
+
+let modoBodega = "recibido";
+let bodegaEditada = null; // lo recibido que se está corrigiendo, o null si es nuevo
+$("#btn-recibido").addEventListener("click", () => abrirBodega("recibido"));
+$("#btn-conteo").addEventListener("click", () => abrirBodega("ajuste"));
+$("#btn-objetivo").addEventListener("click", async () => {
+  const r = prompt("¿Con cuántos paquetes quieren quedar en bodega después de cada entrega?", String(estadoBodega().objetivo));
+  if (r === null) return;
+  const n = Number(String(r).trim());
+  if (!Number.isInteger(n) || n < 0) { alert("Escribe un número entero de paquetes."); return; }
+  try { await store.fijar("config", "inventario", { objetivo: n }); }
+  catch (x) { alert("No se pudo guardar: " + x.message); }
+});
+
+// «Recibimos de la fábrica» (nuevo o para corregir `mov`) o «Corregir conteo»
+function abrirBodega(modo, mov) {
+  modoBodega = modo;
+  bodegaEditada = mov || null;
+  const b = estadoBodega();
+  const conteo = modo === "ajuste";
+  $("#bd-titulo").textContent = conteo ? "Corregir conteo" : mov ? "Editar lo recibido" : "Recibimos de la fábrica";
+  $("#bd-paq-t").textContent = conteo ? "Paquetes que hay al contar" : "Paquetes recibidos";
+  $("#bd-paq").min = conteo ? "0" : "1";
+  $("#bd-paq").value = mov ? Number(mov.paquetes) || "" : "";
+  $("#bd-fecha").value = mov ? mov.fecha || hoyISO() : hoyISO();
+  $("#bd-desc").value = mov ? mov.descripcion || "" : "";
+  $("#bd-desc").placeholder = conteo ? "Ej.: 2 regalados en el concurso" : "Opcional";
+  $("#bd-fabrica").checked = true;
+  $("#bd-error").textContent = "";
+  formaBodega();
+  $("#bd-guardar").disabled = false;
+  $("#d-bodega").showModal();
+}
+
+// Diferencia entre lo contado y lo que dice la app (null si no han escrito un número)
+function difConteo() {
+  const v = $("#bd-paq").value, n = Number(v);
+  return v === "" || !Number.isInteger(n) || n < 0 ? null : n - estadoBodega().enBodega;
+}
+// Al contar, si hay más de lo que dice la app casi siempre es porque llegaron paquetes de la fábrica
+// sin registrar (por ejemplo, los que uno de los dos recogió y entregó por su lado): esos se suman a
+// lo que le debemos. Si hay menos (regalados, dañados), solo baja la bodega.
+function formaBodega() {
+  const conteo = modoBodega === "ajuste";
+  const d = conteo ? difConteo() : null;
+  $("#bd-fabrica-l").hidden = !(d > 0);
+  if (d > 0) $("#bd-fabrica-t").textContent = d === 1
+    ? "El paquete de más llegó de la fábrica sin registrar: se suma a lo que le debemos."
+    : "Los " + d + " paquetes de más llegaron de la fábrica sin registrar: se suman a lo que le debemos.";
+  $("#bd-ayuda").textContent = !conteo
+    ? "Suben la bodega y lo que le debemos a la fábrica (" + plata(precios(datos).costoPaquete) + " por paquete)." +
+      (estadoBodega().activa ? "" : " Desde este día los pedidos salen de la bodega.")
+    : "Según la app hay " + paqTxt(estadoBodega().enBodega) + "." +
+      (d === null ? "" : d === 0 ? " Coincide." : d < 0 ? " Faltan " + paqTxt(-d) + ": se descuentan de la bodega sin cambiar lo que le debemos a la fábrica."
+        : $("#bd-fabrica").checked ? "" : " Sobran " + paqTxt(d) + ": se suman a la bodega sin cambiar lo que le debemos a la fábrica.");
+}
+$("#bd-paq").addEventListener("input", formaBodega);
+$("#bd-fabrica").addEventListener("change", formaBodega);
+
+$("#f-bodega").addEventListener("submit", async (e) => {
+  if (e.submitter && e.submitter.value === "cancelar") return;
+  e.preventDefault();
+  const conteo = modoBodega === "ajuste";
+  const n = Number($("#bd-paq").value);
+  if ($("#bd-paq").value === "" || !Number.isInteger(n) || n < (conteo ? 0 : 1)) {
+    $("#bd-error").textContent = conteo ? "Escribe cuántos paquetes hay." : "Escribe cuántos paquetes recibieron.";
+    return;
+  }
+  const mov = { tipo: "bodega", motivo: modoBodega, fecha: $("#bd-fecha").value, descripcion: $("#bd-desc").value.trim() };
+  if (conteo) {
+    const dif = n - estadoBodega().enBodega;
+    if (!dif) { $("#bd-error").textContent = "El conteo coincide con la app: no hay nada que corregir."; return; }
+    // Los de más que llegaron de la fábrica se guardan como recibidos (suben la deuda); lo demás, como ajuste
+    Object.assign(mov, { paquetes: dif, conteo: n, motivo: dif > 0 && $("#bd-fabrica").checked ? "recibido" : "ajuste" });
+  } else mov.paquetes = n;
+  // Un solo movimiento por toque: mientras se guarda, el botón no vuelve a guardar
+  if ($("#bd-guardar").disabled) return;
+  $("#bd-guardar").disabled = true;
+  try {
+    if (bodegaEditada) await store.actualizar("movimientos", bodegaEditada.id, { ...mov, editado: new Date().toISOString() });
+    else await store.agregar("movimientos", { ...mov, creado: new Date().toISOString() });
+    $("#d-bodega").close();
+  }
+  catch (x) { $("#bd-error").textContent = "No se pudo guardar: " + x.message; }
+  finally { $("#bd-guardar").disabled = false; }
+});
 
 // =====================================================================
 // 5. CHORIZADA EN DOGSTAR
