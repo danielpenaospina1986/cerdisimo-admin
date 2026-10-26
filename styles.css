@@ -341,3 +341,5 @@ code { font-size: 0.9em; }
 .tabla tr.sel td { background: var(--mustard); }
 .tabla tr[data-viernes]:focus-visible { outline: 3px solid var(--rust-deep); outline-offset: -3px; }
 .tabla tr.suma td { font-weight: 800; border-top: var(--stroke-md) solid var(--ink); }
+.tabla tr.listo td { opacity: .55; } /* preventa ya entregada en La Chorizada Real */
+#ev-pagaron .nota { overflow-wrap: anywhere; } /* correos largos no ensanchan la tabla en el celular */

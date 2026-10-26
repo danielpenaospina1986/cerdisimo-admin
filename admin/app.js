@@ -1492,9 +1492,24 @@ function pintarEvento() {
     '<span class="chip">Vendidos en la carpa: ' + r.vendidosCarpa + "</span>";
 
   const q = norm($("#ev-buscar").value);
-  const lista = r.preventas.filter((x) => !q || norm(x.clienteNombre).includes(q) || norm(codigoPedido(x)).includes(q))
+  const correo = (x) => (cliente(x.clienteId) || {}).email || "";
+  const lista = r.preventas.filter((x) => !q || norm(x.clienteNombre).includes(q) || norm(codigoPedido(x)).includes(q) || norm(correo(x)).includes(q))
     .sort((a, b) => ((r.entregadosDe(a) >= a.choripanes) - (r.entregadosDe(b) >= b.choripanes)) || !!b.pagado - !!a.pagado ||
       (a.clienteNombre || "").localeCompare(b.clienteNombre || ""));
+  // Desplegable con quienes ya pagaron, por orden alfabético, para entregar en la carpa
+  const pagaron = r.preventas.filter((x) => x.pagado).sort((a, b) => (a.clienteNombre || "").localeCompare(b.clienteNombre || ""));
+  $("#ev-pagaron-t").textContent = "Pagaron la preventa (" + pagaron.length + " " + (pagaron.length === 1 ? "persona" : "personas") + ", " + choris(r.preventaPagada) + ")";
+  $("#ev-pagaron").innerHTML = pagaron.length
+    ? "<thead><tr><th>Persona</th><th class=num>Recibió</th><th></th></tr></thead><tbody>" +
+      pagaron.map((x) => {
+        const total = Number(x.choripanes) || 0, dados = r.entregadosDe(x), listo = dados >= total;
+        return "<tr" + (listo ? ' class="listo"' : "") + "><td><strong>" + esc(x.clienteNombre) + "</strong><br><span class=\"nota\">" + esc(correo(x) || "Sin correo") + " · " + codigoPedido(x) + "</span></td>" +
+          '<td class="num">' + dados + " de " + total + "</td><td>" +
+          (listo ? '<button class="btn btn-sec btn-chico" data-acc="ev-quitar" data-id="' + x.id + '">Deshacer</button>'
+            : '<button class="btn btn-chico" data-acc="ev-todos" data-id="' + x.id + '">Entregado</button>') + "</td></tr>";
+      }).join("") + "</tbody>"
+    : '<tbody><tr class="vacia"><td>Todavía nadie ha pagado la preventa.</td></tr></tbody>';
+
   $("#ev-lista").innerHTML = lista.length ? lista.map((x) => tarjetaPreventa(x, r)).join("")
     : '<p class="nota">' + (q ? "Nadie con ese nombre o código." : "Todavía no hay preventas.") + "</p>";
 

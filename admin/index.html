@@ -29,7 +29,7 @@
       <button role="tab" data-vista="contabilidad" aria-selected="false">Contabilidad</button>
       <button role="tab" data-vista="clientes" aria-selected="false">Clientes</button>
       <button role="tab" data-vista="produccion" aria-selected="false">Producción</button>
-      <button role="tab" data-vista="evento" aria-selected="false">Dogstar</button>
+      <button role="tab" data-vista="evento" aria-selected="false">Chorizada Real</button>
     </nav>
   </header>
 
@@ -227,7 +227,7 @@
       <div class="chips" id="ev-resumen"></div>
 
       <h2 class="seccion">Preventas: quién reclama</h2>
-      <input class="campo" id="ev-buscar" type="search" placeholder="Buscar por nombre o código (CC-…)" autocomplete="off">
+      <input class="campo" id="ev-buscar" type="search" placeholder="Buscar por nombre, correo o código (CC-…)" autocomplete="off">
       <div class="lista" id="ev-lista"></div>
 
       <h2 class="seccion">Ventas en la carpa</h2>
@@ -264,6 +264,12 @@
       <button class="btn btn-sec" id="ev-compra" type="button">+ Registrar compra del evento</button>
       <p class="nota">Las compras del evento se guardan como inversiones marcadas «Dogstar»: salen en Contabilidad con las demás y aquí se restan de lo vendido en el evento.</p>
       <div class="tabla-caja"><table class="tabla" id="ev-compras"></table></div>
+
+      <!-- Lista para el día: quiénes pagaron la preventa, para entregar en la carpa por nombre o correo -->
+      <details class="cortes" id="ev-pagaron-caja">
+        <summary id="ev-pagaron-t">Pagaron la preventa</summary>
+        <div class="tabla-caja"><table class="tabla" id="ev-pagaron"></table></div>
+      </details>
     </section>
   </main>
 
