@@ -1,0 +1,123 @@
+/* Botones con movimiento de caricatura de los años 30 (rubber hose).
+   Al apretar, el botón se aplasta contra su sombra; al soltar, rebota: se estira, cae y se asienta.
+   Las poses van de dos en dos cuadros (steps), como la animación dibujada a mano.
+   animar.js pone y quita las clases (.rebota, .sube, .baja, .menea, .columpia, .pop, .nono).
+   Solo usa translate, scale y rotate sueltos, así no pisa los giros fijos de la marca (transform). */
+
+@media (prefers-reduced-motion: no-preference) {
+  body { overflow-x: clip; }
+
+  .btn, .btn-mini, .stepper button, .pestanas button, .franja-ver, .check input {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transform-origin: 50% 100%;
+  }
+  .btn { transition: none; }
+  /* Los botones anchos se estiran poco de lado para no salirse de la pantalla */
+  .btn-grande { --ancho: .3; }
+
+  /* Apretar: se aplasta y se hunde en la sombra */
+  .btn:active { transform: none; translate: 3px 3px; scale: calc(1 + .06 * var(--ancho, 1)) .9; }
+  .btn-grande:active { transform: rotate(-1deg); }
+  .btn-mini:active, .franja-evento summary:active .franja-ver {
+    translate: 2px 2px; scale: 1.08 .86; box-shadow: 1px 1px 0 var(--ink);
+  }
+  .stepper button:active { scale: 1.18 .8; }
+  .pestanas button:active { scale: 1.06 .9; }
+  :is(.btn, .btn-mini, .stepper button, .pestanas button):active,
+  .franja-evento summary:active .franja-ver { animation: none; }
+
+  /* Con algo en el pedido, el botón para comprar baila cada tanto, como en las caricaturas.
+     Va antes de las demás clases para que el rebote y el "no" le ganen. */
+  :where(#pedir-btn, #evento-btn):not(:disabled) { animation: cc-baile 4.2s steps(2, end) 1s infinite; }
+  @keyframes cc-baile {
+    0%, 32%, 100% { translate: 0 0;    scale: 1 1;       rotate: 0deg; }
+    5%            { translate: 0 -9px; scale: .98 1.07;  rotate: -2.5deg; }
+    10%           { translate: 0 0;    scale: 1.03 .9;   rotate: 0deg; }
+    15%           { translate: 0 -9px; scale: .98 1.07;  rotate: 2.5deg; }
+    20%           { translate: 0 0;    scale: 1.03 .9;   rotate: 0deg; }
+    25%           { translate: 0 -3px; scale: 1 1.03;    rotate: -1deg; }
+  }
+
+  /* Soltar: rebota */
+  .rebota { animation: cc-rebote .48s steps(2, end); }
+  @keyframes cc-rebote {
+    0%   { translate: 0 0;    scale: calc(1 + .1 * var(--ancho, 1)) .86; }
+    20%  { translate: 0 -7px; scale: calc(1 - .1 * var(--ancho, 1)) 1.14; }
+    40%  { translate: 0 -3px; scale: .98 1.03; }
+    60%  { translate: 0 0;    scale: calc(1 + .06 * var(--ancho, 1)) .93; }
+    80%  { translate: 0 -1px; scale: .99 1.02; }
+    100% { translate: 0 0;    scale: 1 1; }
+  }
+
+  /* La cantidad salta al sumar y se aplasta al restar */
+  .stepper output { transform-origin: 50% 100%; }
+  .sube { animation: cc-sube .42s steps(2, end); }
+  @keyframes cc-sube {
+    0%   { translate: 0 -6px; scale: .7 1.45; }
+    25%  { translate: 0 0;    scale: 1.3 .78; }
+    50%  { scale: .92 1.1; }
+    75%  { scale: 1.05 .96; }
+    100% { translate: 0 0;    scale: 1 1; }
+  }
+  .baja { animation: cc-baja .38s steps(2, end); }
+  @keyframes cc-baja {
+    0%   { translate: 0 3px;  scale: 1.45 .6; }
+    35%  { translate: 0 -2px; scale: .86 1.18; }
+    70%  { translate: 0 0;    scale: 1.05 .95; }
+    100% { translate: 0 0;    scale: 1 1; }
+  }
+
+  /* El producto se menea cuando entra al pedido, y el chip de Promo se columpia */
+  .prod { transform-origin: 50% 100%; }
+  .menea { animation: cc-meneo .56s steps(2, end); }
+  @keyframes cc-meneo {
+    0%   { rotate: 0deg;    scale: 1; }
+    15%  { rotate: -2.2deg; scale: 1.03; }
+    35%  { rotate: 1.8deg; }
+    55%  { rotate: -1.1deg; }
+    75%  { rotate: .5deg; }
+    100% { rotate: 0deg;    scale: 1; }
+  }
+  .prod-chip { transform-origin: 50% 0; }
+  .columpia { animation: cc-columpio .6s steps(2, end); }
+  @keyframes cc-columpio {
+    0%   { rotate: 0deg; }
+    15%  { rotate: -16deg; }
+    35%  { rotate: 11deg; }
+    55%  { rotate: -6deg; }
+    75%  { rotate: 3deg; }
+    100% { rotate: 0deg; }
+  }
+
+  /* El total y la opción elegida dan un brinco */
+  .total strong { display: inline-block; transform-origin: 30% 80%; }
+  .check input { transform-origin: 50% 50%; }
+  .pop { animation: cc-pop .36s steps(2, end); }
+  @keyframes cc-pop {
+    0%   { scale: 1.28; }
+    30%  { scale: .9; }
+    60%  { scale: 1.06; }
+    100% { scale: 1; }
+  }
+
+  /* "No": cuando sale un error, o la cantidad ya no puede bajar ni subir más */
+  .nono { animation: cc-nono .5s steps(2, end); }
+  @keyframes cc-nono {
+    0%   { translate: 0 0; }
+    15%  { translate: -9px 0; rotate: -2deg; }
+    35%  { translate: 8px 0;  rotate: 2deg; }
+    55%  { translate: -5px 0; rotate: -1deg; }
+    75%  { translate: 3px 0;  rotate: 0deg; }
+    100% { translate: 0 0;    rotate: 0deg; }
+  }
+
+  /* La preventa cae en su sitio al abrirla */
+  .franja-evento[open] .evento { animation: cc-cae .4s steps(2, end); }
+  @keyframes cc-cae {
+    0%   { translate: 0 -14px; opacity: 0; }
+    40%  { translate: 0 3px;   opacity: 1; }
+    70%  { translate: 0 -1px; }
+    100% { translate: 0 0; }
+  }
+}
