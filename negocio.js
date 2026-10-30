@@ -20,7 +20,7 @@ export const PRECIOS_BASE = {
 export const PRODUCTOS = [
   { id: "p1", nombre: "1 paquete", detalle: "5 chorizos", paquetes: 1, litros: 0, precio: "precio1" },
   { id: "p2", nombre: "2 paquetes", detalle: "10 chorizos", paquetes: 2, litros: 0, precio: "precio2" },
-  { id: "p3", nombre: "3 paquetes", detalle: "Promo · 15 chorizos", paquetes: 3, litros: 0, precio: "precio3" },
+  { id: "p3", nombre: "3 paquetes", detalle: "Promo · 15 chorizos", paquetes: 3, litros: 0, precio: "precio3", promo: true },
   { id: "asado", nombre: "Combo Asado", detalle: "5 paquetes + 1 L de aguardiente", paquetes: 5, litros: 1, precio: "precioAsado" },
   { id: "finquero", nombre: "Combo Finquero", detalle: "10 paquetes + 3 L de aguardiente", paquetes: 10, litros: 3, precio: "precioFinquero" }
 ];
