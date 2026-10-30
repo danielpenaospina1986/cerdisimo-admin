@@ -251,16 +251,28 @@ const isoDe = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2
 
 function pintarProductos() {
   const p = P();
-  // La oferta estrella (3 paquetes) va siempre en mostaza con su chip, como en el póster
-  $("#productos").innerHTML = '<legend class="etq">Elige tus chorizos</legend>' + PRODUCTOS.map((prod) =>
-    '<div class="prod' + (prod.promo ? " promo" : "") + (cantidades[prod.id] ? " activo" : "") + '">' +
-    (prod.promo ? '<span class="prod-chip">Promo</span>' : "") +
-    '<div class="prod-n">' + prod.nombre + '<span class="prod-precio">' + plata(p[prod.precio]) + "</span>" +
-    "<small>" + prod.detalle.replace(/^Promo · /, "") + '</small></div><div class="stepper">' +
-    '<button type="button" data-paso="-1" data-prod="' + prod.id + '" aria-label="Quitar ' + prod.nombre + '">−</button>' +
-    "<output>" + (cantidades[prod.id] || 0) + "</output>" +
-    '<button type="button" data-paso="1" data-prod="' + prod.id + '" aria-label="Agregar ' + prod.nombre + '">+</button></div></div>'
-  ).join("");
+  const caja = $("#productos");
+  // Las tarjetas se arman de nuevo solo si cambian los precios; si no, se actualizan las cantidades
+  // sin reemplazar los botones, para no cortar su movimiento (animar.js)
+  const firma = PRODUCTOS.map((prod) => prod.id + "=" + p[prod.precio]).join(",");
+  if (caja.dataset.firma !== firma) {
+    caja.dataset.firma = firma;
+    // La oferta estrella (3 paquetes) va siempre en mostaza con su chip, como en el póster
+    caja.innerHTML = '<legend class="etq">Elige tus chorizos</legend>' + PRODUCTOS.map((prod) =>
+      '<div class="prod' + (prod.promo ? " promo" : "") + '" data-prod="' + prod.id + '">' +
+      (prod.promo ? '<span class="prod-chip">Promo</span>' : "") +
+      '<div class="prod-n">' + prod.nombre + '<span class="prod-precio">' + plata(p[prod.precio]) + "</span>" +
+      "<small>" + prod.detalle.replace(/^Promo · /, "") + '</small></div><div class="stepper">' +
+      '<button type="button" data-paso="-1" data-prod="' + prod.id + '" aria-label="Quitar ' + prod.nombre + '">−</button>' +
+      "<output>0</output>" +
+      '<button type="button" data-paso="1" data-prod="' + prod.id + '" aria-label="Agregar ' + prod.nombre + '">+</button></div></div>'
+    ).join("");
+  }
+  caja.querySelectorAll(".prod").forEach((el) => {
+    const n = cantidades[el.dataset.prod] || 0;
+    el.classList.toggle("activo", n > 0);
+    el.querySelector("output").textContent = n;
+  });
   actualizarTotal();
 }
 
