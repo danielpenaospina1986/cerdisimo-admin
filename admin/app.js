@@ -36,12 +36,29 @@ async function iniciar() {
       $("#cargando").hidden = true;
       pintar();
       revisarAlertas(!info || info.alDia);
+      if (!info || info.alDia) sincronizarTienda();
     });
     return sesion;
   } catch (e) {
     $("#cargando").textContent = e.message;
     console.error(e);
   }
+}
+
+// La vitrina de la tienda la ve cualquiera, sin entrar: lee config/tienda, una copia de los precios
+// de venta y los datos de pago, sin los costos. Se actualiza sola cuando cambian los precios.
+const CAMPOS_TIENDA = ["precio1", "precio2", "precio3", "precioAsado", "precioFinquero", "precioChoripan",
+  "precioChoripanSitio", "domi", "gratisDesde", "ciudad", "nequi", "whatsapp"];
+let tiendaEscrita = "";
+function sincronizarTienda() {
+  const p = precios(datos);
+  const pub = {};
+  CAMPOS_TIENDA.forEach((k) => { if (p[k] !== undefined) pub[k] = p[k]; });
+  const actual = datos.config.find((c) => c.id === "tienda") || {};
+  const nueva = JSON.stringify(pub);
+  if (nueva === tiendaEscrita || CAMPOS_TIENDA.every((k) => pub[k] === actual[k])) return;
+  tiendaEscrita = nueva;
+  store.fijar("config", "tienda", pub).catch((e) => { tiendaEscrita = ""; console.warn(e); });
 }
 
 // Pedidos de la app que siguen sin pagar al corte del jueves: se cancelan solos.

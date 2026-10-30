@@ -6,7 +6,8 @@ rules_version = '2';
 //
 // Clientes de la app de pedidos (/pedidos): cualquier persona que entre con Google o con el
 // enlace al correo. Solo ve y edita su propia ficha (clientes/{su uid}) y sus propios pedidos,
-// lee los precios, y nunca puede marcar un pedido como pagado ni entregado.
+// lee los precios, y nunca puede marcar un pedido como pagado ni entregado. Quien no ha entrado
+// solo lee config/tienda (la vitrina).
 service cloud.firestore {
   match /databases/{database}/documents {
     function esSocio() {
@@ -67,6 +68,8 @@ service cloud.firestore {
     match /config/{id} {
       allow read, write: if esSocio();
       allow read: if request.auth != null && id == 'precios';
+      // La vitrina de la tienda, sin entrar: precios de venta y datos de pago, sin costos
+      allow read: if id == 'tienda';
     }
   }
 }

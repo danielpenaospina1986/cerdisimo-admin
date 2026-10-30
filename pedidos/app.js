@@ -13,37 +13,127 @@ const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 let store, usuario = null, ficha = null, pedidos = [], config = null;
+// Quien no ha entrado ve la vitrina con los precios de config/tienda (sin costos)
+let visitante = false, tienda = null, escuchandoTienda = false;
 const cantidades = {};
-const ui = { vista: "pedir", pagando: null, cargados: { ficha: false, pedidos: false, precios: false } };
+let choripanes = 0;
+const ui = { vista: "pedir", pagando: null, retomar: false, errorEnlace: "", cargados: { ficha: false, pedidos: false, precios: false } };
+const enInstagram = /Instagram|FBAN|FBAV|FB_IAB/i.test(navigator.userAgent);
 
-const P = () => precios({ config: config ? [{ ...config, id: "precios" }] : [] });
+const P = () => {
+  const c = usuario ? config : tienda;
+  return precios({ config: c ? [{ ...c, id: "precios" }] : [] });
+};
+
+// Mensajes de error en palabras de la tienda: qué pasó y qué hacer. El detalle técnico va a la consola.
+const ERRORES = {
+  "auth/invalid-action-code": "Ese enlace ya se usó o ya no sirve. Pide uno nuevo.",
+  "auth/expired-action-code": "Ese enlace venció. Pide uno nuevo.",
+  "auth/invalid-email": "A ese correo le falta algo. Revísalo y vuelve a intentar.",
+  "auth/missing-email": "Escribe tu correo.",
+  "auth/popup-blocked": "El navegador bloqueó la ventana de Google. Vuelve a tocar el botón o entra con tu correo.",
+  "auth/network-request-failed": "No hay conexión. Revisa tus datos o el wifi y vuelve a intentar.",
+  "unavailable": "No hay conexión. Revisa tus datos o el wifi y vuelve a intentar.",
+  "auth/too-many-requests": "Fueron muchos intentos seguidos. Espera unos minutos y vuelve a intentar.",
+  "auth/quota-exceeded": "Hoy ya se enviaron muchos enlaces. Entra con Google o escríbenos por WhatsApp.",
+  "permission-denied": "La tienda no te dejó hacer eso. Sal, vuelve a entrar e inténtalo otra vez; si sigue igual, escríbenos por WhatsApp."
+};
+function explicar(e, accion) {
+  console.error(e);
+  return ERRORES[e && e.code] || "No pudimos " + accion + ". Revisa tu conexión y vuelve a intentar; si sigue igual, escríbenos por WhatsApp.";
+}
+
+// ---------- Carrito: lo elegido sobrevive a entrar (también con el enlace del correo) ----------
+const LLAVE_CARRITO = "cerdisimo-carrito";
+const hayCarrito = () => Object.values(cantidades).some((n) => n > 0) || choripanes > 0;
+function guardarCarrito() {
+  try {
+    if (hayCarrito()) {
+      localStorage.setItem(LLAVE_CARRITO, JSON.stringify({
+        items: { ...cantidades }, choripanes, recoge: recoge(), notas: $("#pedir-notas").value.trim(), guardado: new Date().toISOString()
+      }));
+    } else localStorage.removeItem(LLAVE_CARRITO);
+  } catch (e) { /* sin almacenamiento el carrito vive solo en esta página */ }
+}
+function aplicarCarrito(c) {
+  if (!c || typeof c !== "object") return false;
+  Object.keys(cantidades).forEach((k) => delete cantidades[k]);
+  PRODUCTOS.forEach((x) => {
+    const n = Math.floor(Number(c.items && c.items[x.id]) || 0);
+    if (n > 0 && n <= 50) cantidades[x.id] = n;
+  });
+  choripanes = Math.max(0, Math.min(20, Math.floor(Number(c.choripanes) || 0)));
+  if (c.recoge) $('input[name="recibe"][value="recoge"]').checked = true;
+  if (typeof c.notas === "string") $("#pedir-notas").value = c.notas.slice(0, 200);
+  return hayCarrito();
+}
+function recuperarCarrito() {
+  // El enlace del correo trae el carrito en la dirección (?carrito=…), por si se abre en otro navegador
+  const q = new URLSearchParams(location.search).get("carrito");
+  if (q) { try { if (aplicarCarrito(JSON.parse(q))) return true; } catch (e) { /* enlace viejo o roto */ } }
+  try {
+    const c = JSON.parse(localStorage.getItem(LLAVE_CARRITO));
+    if (c && Date.now() - new Date(c.guardado).getTime() < 864e5) return aplicarCarrito(c);
+  } catch (e) { /* nada guardado */ }
+  return false;
+}
+// Sin las notas: la dirección del enlace pasa por el servidor del correo
+const carritoParaEnlace = () => "carrito=" + encodeURIComponent(JSON.stringify({ items: { ...cantidades }, choripanes, recoge: recoge() }));
 
 // ---------- Arranque ----------
 async function iniciar() {
   if (modoPrueba) $("#aviso-prueba").hidden = false;
+  recuperarCarrito();
   try {
     store = await crearStore();
     try { await store.completarEnlace(); }
-    catch (e) { $("#login-error").textContent = "No se pudo entrar con el enlace: " + e.message + " Pide uno nuevo."; }
-    store.estadoSesion((u) => (u ? entrar(u) : mostrarLogin()));
+    catch (e) { ui.errorEnlace = explicar(e, "entrar con el enlace"); }
+    store.estadoSesion((u) => (u ? entrar(u) : mostrarVitrina()));
   } catch (e) {
-    $("#cargando").textContent = "No se pudo cargar: " + e.message;
     console.error(e);
+    $("#cargando").textContent = "No pudimos abrir la tienda. Revisa tu conexión y vuelve a cargar la página.";
   }
 }
 
-function mostrarLogin() {
+// Sin sesión: la vitrina con la foto, los productos y los precios; se entra al hacer el pedido
+function mostrarVitrina() {
   usuario = null;
-  $("#cargando").hidden = true;
+  visitante = true;
   $("#pestanas").hidden = true;
   $("#salir").hidden = true;
-  mostrar("login");
+  $("#entrar").hidden = false;
+  if (ui.errorEnlace) { $("#login-error").textContent = ui.errorEnlace; ui.errorEnlace = ""; ui.vista = "login"; }
+  else ui.vista = "pedir";
+  if (escuchandoTienda) { pintar(); return; }
+  escuchandoTienda = true;
+  store.escucharTienda((c) => {
+    tienda = c;
+    if (usuario || !visitante) return;
+    $("#cargando").hidden = true;
+    pintar();
+  });
+}
+
+function irAEntrar() { ui.vista = "login"; pintar(); window.scrollTo(0, 0); }
+$("#entrar").onclick = irAEntrar;
+$("#login-volver").onclick = () => { ui.vista = "pedir"; pintar(); window.scrollTo(0, 0); };
+
+function pintarLogin() {
+  const c = calcularPedido(cantidades, P(), recoge());
+  const partes = [];
+  if (c.paquetes) partes.push(c.resumen + " por " + plata(c.total));
+  if (choripanes) partes.push(choripanes + (choripanes === 1 ? " choripán" : " choripanes") + " de preventa por " + plata(choripanes * P().precioChoripan));
+  $("#login-carrito").hidden = !partes.length;
+  $("#login-carrito").innerHTML = "<strong>Tu pedido:</strong> " + esc(partes.join(" y ")) + ". Queda guardado mientras entras.";
+  $("#login-instagram").hidden = !enInstagram;
 }
 
 $("#entrar-google").onclick = async () => {
   $("#login-error").textContent = "";
   try { await store.entrarConGoogle(); }
-  catch (e) { if (e.code !== "auth/popup-closed-by-user") $("#login-error").textContent = "No se pudo entrar: " + e.message; }
+  catch (e) {
+    if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") $("#login-error").textContent = explicar(e, "entrar con Google");
+  }
 };
 
 $("#f-enlace").addEventListener("submit", async (e) => {
@@ -52,17 +142,21 @@ $("#f-enlace").addEventListener("submit", async (e) => {
   $("#login-error").textContent = "";
   $("#enlace-estado").textContent = "Enviando…";
   try {
-    await store.enviarEnlace(correo);
-    $("#enlace-estado").textContent = "Listo. Abre el enlace que te llegó a " + correo + " desde este mismo celular (revisa también la carpeta de spam).";
+    guardarCarrito();
+    await store.enviarEnlace(correo, hayCarrito() ? carritoParaEnlace() : "");
+    $("#enlace-estado").textContent = "Listo. Abre el enlace que te llegó a " + correo + " (revisa también la carpeta de spam)." +
+      (hayCarrito() ? " Tu pedido te espera allá." : "");
   } catch (x) {
     $("#enlace-estado").textContent = "";
-    $("#login-error").textContent = "No se pudo enviar el enlace: " + x.message;
+    $("#login-error").textContent = explicar(x, "enviar el enlace");
   }
 });
 
 async function entrar(u) {
   if (usuario && usuario.uid === u.uid) return;
   usuario = u;
+  visitante = false;
+  $("#entrar").hidden = true;
   $("#cargando").hidden = false;
   mostrar(null);
   // Daniel y Mariana que lleguen aquí (por ejemplo con el ícono viejo de la administración) pasan a su app
@@ -95,8 +189,12 @@ function listo() {
   $("#pestanas").hidden = false;
   if (primeraVez) {
     primeraVez = false;
+    // Si eligió algo antes de entrar, sigue con ese pedido (después de llenar sus datos, si es nuevo)
+    ui.retomar = hayCarrito();
     if (!ficha) ui.vista = "datos";
+    else if (ui.retomar) ui.vista = "pedir";
     else if (pedidos.some((p) => p.estado === "por_pagar" || p.estado === "rechazado")) ui.vista = "mis";
+    else ui.vista = "pedir";
   }
   pintar();
 }
@@ -111,7 +209,15 @@ function mostrar(vista) {
 }
 
 function pintar() {
-  if (!usuario) return;
+  if (!usuario) {
+    if (!visitante) return;
+    if (ui.vista !== "login") ui.vista = "pedir";
+    $("#entrar").hidden = ui.vista === "login";
+    mostrar(ui.vista);
+    if (ui.vista === "pedir") pintarPedir(); else pintarLogin();
+    return;
+  }
+  if (ui.vista === "login") ui.vista = "pedir";
   if (!ficha && ui.vista !== "datos") ui.vista = "datos";
   const tab = ui.vista === "pagar" ? "mis" : ui.vista;
   document.querySelectorAll("#pestanas button").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.vista === tab)));
@@ -127,7 +233,15 @@ function pintar() {
 // =====================================================================
 function pintarPedir() {
   const v = viernesParaPedidoWeb();
-  $("#saludo").textContent = "Hola, " + (ficha.nombre || "").split(" ")[0];
+  // Sin sesión, la portada grande; con sesión, la foto chica al lado del saludo
+  $("#portada").classList.toggle("corta", !!usuario);
+  $("#saludo").textContent = usuario ? "Hola, " + ((ficha && ficha.nombre) || "").split(" ")[0] : "Chorizos artesanales";
+  $("#portada-titulo").textContent = usuario ? "¿Qué te llevamos?" : "Pide para el viernes";
+  const sigue = usuario && ui.retomar && hayCarrito();
+  $("#pedir-sigue").hidden = !sigue;
+  if (sigue) $("#pedir-sigue").textContent = Object.values(cantidades).some((n) => n > 0)
+    ? "Tu pedido sigue aquí. Revísalo y toca «Hacer pedido»."
+    : "Tu preventa sigue aquí. Revísala y toca «Comprar preventa».";
   $("#entrega-info").innerHTML = "Llega el <strong>" + fechaLarga(v) + "</strong>. Recibimos pedidos para ese viernes hasta el " +
     fechaLarga(isoDe(corteDe(v))) + " a las 12 m.";
   pintarProductos();
@@ -137,9 +251,12 @@ const isoDe = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2
 
 function pintarProductos() {
   const p = P();
+  // La oferta estrella (3 paquetes) va siempre en mostaza con su chip, como en el póster
   $("#productos").innerHTML = '<legend class="etq">Elige tus chorizos</legend>' + PRODUCTOS.map((prod) =>
-    '<div class="prod' + (cantidades[prod.id] ? " activo" : "") + '"><div class="prod-n">' + prod.nombre + " · " + plata(p[prod.precio]) +
-    "<small>" + prod.detalle + '</small></div><div class="stepper">' +
+    '<div class="prod' + (prod.promo ? " promo" : "") + (cantidades[prod.id] ? " activo" : "") + '">' +
+    (prod.promo ? '<span class="prod-chip">Promo</span>' : "") +
+    '<div class="prod-n">' + prod.nombre + '<span class="prod-precio">' + plata(p[prod.precio]) + "</span>" +
+    "<small>" + prod.detalle.replace(/^Promo · /, "") + '</small></div><div class="stepper">' +
     '<button type="button" data-paso="-1" data-prod="' + prod.id + '" aria-label="Quitar ' + prod.nombre + '">−</button>' +
     "<output>" + (cantidades[prod.id] || 0) + "</output>" +
     '<button type="button" data-paso="1" data-prod="' + prod.id + '" aria-label="Agregar ' + prod.nombre + '">+</button></div></div>'
@@ -150,10 +267,12 @@ function pintarProductos() {
 $("#productos").addEventListener("click", (e) => {
   const b = e.target.closest("[data-paso]");
   if (!b) return;
-  cantidades[b.dataset.prod] = Math.max(0, (cantidades[b.dataset.prod] || 0) + Number(b.dataset.paso));
+  cantidades[b.dataset.prod] = Math.max(0, Math.min(50, (cantidades[b.dataset.prod] || 0) + Number(b.dataset.paso)));
   pintarProductos();
+  guardarCarrito();
 });
-document.querySelectorAll('input[name="recibe"]').forEach((r) => r.addEventListener("change", actualizarTotal));
+document.querySelectorAll('input[name="recibe"]').forEach((r) => r.addEventListener("change", () => { actualizarTotal(); guardarCarrito(); }));
+$("#pedir-notas").addEventListener("change", guardarCarrito);
 const recoge = () => $('input[name="recibe"]:checked').value === "recoge";
 
 function actualizarTotal() {
@@ -165,6 +284,7 @@ function actualizarTotal() {
     : "Agrega al menos un producto.";
   $("#dir-pedido").textContent = recoge()
     ? "Te escribimos por WhatsApp para acordar dónde recogerlo."
+    : !usuario ? "Al hacer el pedido entras con Google o con tu correo y nos dices a dónde te lo llevamos."
     : ficha && ficha.direccion ? "Lo llevamos a: " + ficha.direccion + (ficha.notas ? " · " + ficha.notas : "") : "";
   $("#pedir-btn").disabled = !c.paquetes;
   if (c.domi) $("#total").insertAdjacentHTML("beforeend", "<br><small>Domicilio gratis desde " + p.gratisDesde + " paquetes.</small>");
@@ -178,6 +298,7 @@ $("#f-pedir").addEventListener("submit", async (e) => {
   PRODUCTOS.forEach((x) => { if (cantidades[x.id]) items[x.id] = cantidades[x.id]; });
   const calc = calcularPedido(items, P(), recoge());
   if (!calc.paquetes) { err.textContent = "Agrega al menos un producto."; return; }
+  if (!usuario) { guardarCarrito(); irAEntrar(); return; }
   if (!recoge() && !ficha.direccion) { err.textContent = "Agrega tu dirección en Mis datos o elige recogerlo."; return; }
   const btn = $("#pedir-btn"); btn.disabled = true;
   try {
@@ -190,22 +311,25 @@ $("#f-pedir").addEventListener("submit", async (e) => {
     });
     Object.keys(cantidades).forEach((k) => delete cantidades[k]);
     $("#pedir-notas").value = "";
+    ui.retomar = false;
+    guardarCarrito();
     irAPagar(id);
   } catch (x) {
-    err.textContent = "No se pudo guardar el pedido: " + x.message;
+    err.textContent = explicar(x, "guardar el pedido");
   } finally { btn.disabled = false; }
 });
 
 // =====================================================================
 // Preventa de choripanes para la chorizada en Dogstar
 // =====================================================================
-let choripanes = 0;
-
 function pintarEvento() {
   const abierta = preventaAbierta();
-  $("#f-evento").hidden = !abierta;
+  $("#evento-caja").hidden = !abierta;
   if (!abierta) return;
   const p = P();
+  if (choripanes > 0) $("#evento-caja").open = true;
+  $("#evento-resumen").textContent = "Choripán a " + plata(p.precioChoripan) + " en preventa. " +
+    fechaLarga(EVENTO.fecha).replace(/^./, (c) => c.toUpperCase()) + " en " + EVENTO.lugar.split(",")[0] + ".";
   $("#evento-cuando").innerHTML = "En " + EVENTO.lugar + ". <strong>" + fechaLarga(EVENTO.fecha).replace(/^./, (c) => c.toUpperCase()) + "</strong>, de " + EVENTO.horario +
     " Cierre de año y apertura de la temporada navideña. La preventa va hasta el " + fechaLarga(EVENTO.cierre) + " " + EVENTO.cierreTexto;
   $("#evento-precio").textContent = plata(p.precioChoripan);
@@ -223,6 +347,7 @@ $("#f-evento").addEventListener("click", (e) => {
   if (!b) return;
   choripanes = Math.max(0, Math.min(20, choripanes + Number(b.dataset.pasoEvento)));
   pintarEvento();
+  guardarCarrito();
 });
 
 $("#f-evento").addEventListener("submit", async (e) => {
@@ -231,6 +356,7 @@ $("#f-evento").addEventListener("submit", async (e) => {
   err.textContent = "";
   if (!choripanes) { err.textContent = "Elige cuántos choripanes quieres."; return; }
   if (!preventaAbierta()) { err.textContent = "La preventa ya cerró. Te esperamos en la carpa."; pintarEvento(); return; }
+  if (!usuario) { guardarCarrito(); irAEntrar(); return; }
   const items = { choripan: choripanes };
   const calc = calcularPedido(items, P(), true);
   const btn = $("#evento-btn"); btn.disabled = true;
@@ -243,9 +369,10 @@ $("#f-evento").addEventListener("submit", async (e) => {
       creado: hoy, creadoEn: new Date().toISOString()
     });
     choripanes = 0;
+    guardarCarrito();
     irAPagar(id);
   } catch (x) {
-    err.textContent = "No se pudo guardar la preventa: " + x.message;
+    err.textContent = explicar(x, "guardar la preventa");
   } finally { btn.disabled = false; pintarEvento(); }
 });
 
@@ -293,7 +420,7 @@ $("#f-pagar").addEventListener("submit", async (e) => {
   try {
     await store.actualizarPedido(ui.pagando, { estado: "por_verificar", comprobante, reportadoEn: new Date().toISOString() });
     ui.vista = "mis"; pintar();
-  } catch (x) { $("#pagar-error").textContent = "No se pudo guardar: " + x.message; }
+  } catch (x) { $("#pagar-error").textContent = explicar(x, "guardar tu pago"); }
 });
 
 // =====================================================================
@@ -323,7 +450,8 @@ function pintarMis() {
       : AYUDA[p.estado] || "";
     const puedePagar = !p.entregado && (p.estado === "por_pagar" || p.estado === "rechazado");
     const puedeCancelar = !p.entregado && ["por_pagar", "por_verificar", "rechazado"].includes(p.estado);
-    return '<article class="pedido ' + (estado === "cancelado" ? "cancelado" : p.pagado ? "pagado" : "pendiente") + '">' +
+    // Rosado solo cuando falta algo del cliente; mientras Mariana revisa el pago, mostaza
+    return '<article class="pedido ' + (estado === "cancelado" ? "cancelado" : p.pagado ? "pagado" : p.estado === "por_verificar" ? "revisando" : "pendiente") + '">' +
       '<div class="pedido-cab"><p class="pedido-nombre"><span class="pedido-codigo">' + codigoPedido(p) + "</span></p>" +
       '<span class="estado ' + (p.entregado ? "verde" : COLOR[p.estado] || "gris") + '">' + nombreEstado + "</span>" +
       '<span class="pedido-total">' + plata(p.total) + "</span></div>" +
@@ -349,11 +477,12 @@ $("#mis-lista").addEventListener("click", async (e) => {
     Object.keys(cantidades).forEach((k) => delete cantidades[k]);
     Object.assign(cantidades, p.items || {});
     document.querySelector('input[name="recibe"][value="' + (p.recoge ? "recoge" : "domi") + '"]').checked = true;
+    guardarCarrito();
     ui.vista = "pedir"; pintar(); window.scrollTo(0, 0);
   }
   if (b.dataset.acc === "cancelar" && p && confirm("¿Cancelar el pedido " + codigoPedido(p) + "?" + (p.estado === "por_verificar" ? "\nSi ya pagaste, escríbenos por WhatsApp para devolverte la plata." : ""))) {
     try { await store.actualizarPedido(p.id, { estado: "cancelado", canceladoPor: "cliente", canceladoEn: new Date().toISOString() }); }
-    catch (x) { alert("No se pudo cancelar: " + x.message); }
+    catch (x) { alert(explicar(x, "cancelar el pedido")); }
   }
 });
 
@@ -416,7 +545,7 @@ $("#d-buscar").onclick = async () => {
     const p = await geocodificar(dir);
     if (p) ponerPin(p.lat, p.lng, false);
     else $("#d-estado").textContent = "No la encontré. Toca el mapa en tu casa.";
-  } catch (e) { $("#d-estado").textContent = "No se pudo buscar: " + e.message; }
+  } catch (e) { console.error(e); $("#d-estado").textContent = "No pudimos buscar la dirección. Toca el mapa en el punto de tu casa."; }
 };
 
 $("#f-datos").addEventListener("submit", async (e) => {
@@ -444,7 +573,7 @@ $("#f-datos").addEventListener("submit", async (e) => {
     datosPintados = false;
     if (primera) { ui.vista = "pedir"; pintar(); window.scrollTo(0, 0); }
     else { $("#d-estado").textContent = "Datos guardados ✓"; }
-  } catch (x) { err.textContent = "No se pudo guardar: " + x.message; }
+  } catch (x) { err.textContent = explicar(x, "guardar tus datos"); }
   finally { btn.disabled = false; }
 });
 // Si cambia la dirección, el pin anterior deja de valer hasta ubicarla de nuevo o tocar el mapa

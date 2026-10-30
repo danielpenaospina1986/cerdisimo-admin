@@ -1,8 +1,29 @@
 /* App de pedidos para clientes: usa los tokens y componentes de ../styles.css */
 main { max-width: 620px; }
-.hero { text-align: center; margin: 18px 0 16px; }
-.hero .titulo { margin-bottom: 8px; }
-.hero p:last-child { margin: 0 auto; max-width: 420px; }
+
+/* Portada de la vitrina: la foto oficial en marco polaroid con el sello 100% cerdo, como en el póster */
+.portada { text-align: center; margin: 34px 0 18px; }
+.foto { position: relative; width: min(340px, 88%); margin: 0 auto 20px; transform: rotate(-2deg); }
+.foto-marco { padding: 8px; background: var(--paper); border: var(--stroke-lg) solid var(--ink); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+.foto-marco img { display: block; width: 100%; height: auto; aspect-ratio: 720 / 440; object-fit: cover; border: 2px solid var(--ink); border-radius: 10px; }
+.sello { position: absolute; left: -18px; top: -32px; width: 88px; height: 88px; transform: rotate(-12deg); display: grid; place-items: center; }
+.sello svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(3px 3px 0 var(--ink)); }
+.sello polygon { fill: var(--mustard); stroke: var(--ink); stroke-width: 3; stroke-linejoin: round; }
+.sello-t { position: relative; display: flex; flex-direction: column; align-items: center; font: 400 13px/0.95 var(--font-display); color: var(--ink); letter-spacing: .02em; }
+.sello-t b { font-weight: 400; font-size: 24px; }
+.portada .titulo { margin-bottom: 8px; }
+.portada-p { max-width: 400px; margin: 0 auto; }
+/* Con la sesión abierta: la foto chica al lado del saludo, para llegar rápido a los productos */
+.portada.corta { display: grid; grid-template-columns: minmax(0, 42%) minmax(0, 1fr); align-items: center; gap: 18px; text-align: left; margin: 26px 0 16px; }
+.portada.corta .foto { width: 100%; margin: 0; }
+.portada.corta .sello { width: 60px; height: 60px; left: -12px; top: -24px; }
+.portada.corta .sello-t { font-size: 9px; }
+.portada.corta .sello-t b { font-size: 16px; }
+.portada.corta .portada-p { display: none; }
+
+/* Entrar */
+.login-carrito { margin: 0 0 12px; }
+.login-intro { margin: 0 0 14px; }
 .o { text-align: center; margin: 4px 0; font-family: var(--font-script); color: var(--rust-deep); }
 
 .entrega-info { background: var(--paper); border: var(--stroke-md) solid var(--ink); border-radius: var(--radius-md); padding: 10px 14px; margin: 0 0 14px; box-shadow: var(--shadow-sm); }
@@ -27,11 +48,39 @@ main { max-width: 620px; }
 .politica { font-size: 14px; }
 .politica summary { cursor: pointer; font-weight: 800; color: var(--rust-deep); }
 
-.evento { margin: 0 0 18px; border-color: var(--rust); }
-.evento .eyebrow { margin: 0; }
-.evento-t { font: 400 28px/1.1 var(--font-display); color: var(--rust); letter-spacing: .02em; margin: 4px 0 6px; }
+/* Preventa de La Chorizada Real: franja rust-deep que se abre al tocarla */
+.franja-evento { margin: 0 0 16px; background: var(--paper); border: var(--stroke-lg) solid var(--ink); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); overflow: hidden; }
+.franja-evento summary { list-style: none; display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--rust-deep); color: var(--paper); cursor: pointer; }
+.franja-evento summary::-webkit-details-marker { display: none; }
+.franja-evento summary:focus-visible { outline: 3px solid var(--mustard); outline-offset: -6px; }
+.franja-evento[open] summary { border-bottom: var(--stroke-md) solid var(--ink); }
+.franja-txt { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.franja-t { font: 400 20px/1.1 var(--font-display); letter-spacing: .02em; }
+.franja-s { font-size: 14px; font-weight: 700; line-height: 1.25; }
+.franja-ver { flex: none; font: 800 14px/1 var(--font-body); color: var(--ink); background: var(--mustard); border: var(--stroke-md) solid var(--ink); border-radius: 999px; padding: 9px 14px; box-shadow: var(--shadow-sm); }
+.franja-ver::before { content: "Ver"; }
+.franja-evento[open] .franja-ver::before { content: "Cerrar"; }
+.evento { padding: 14px 16px 0; }
 .evento-cuando { margin: 0 0 6px; }
 .evento-precio { margin: 0 0 12px; font-weight: 800; }
 .evento-precio span { font: 400 24px/1 var(--font-display); color: var(--rust-deep); }
 .evento-precio small { font-weight: 600; }
 .evento .total { margin: 12px 0 0; }
+
+/* Productos: precio en letra de etiqueta, botones de 44 px para el dedo y la promo siempre en mostaza */
+.productos { gap: 12px; }
+.prod { position: relative; padding: 10px 10px 10px 12px; }
+.prod-precio { display: block; margin-top: 2px; font: 400 20px/1.1 var(--font-display); color: var(--rust-deep); letter-spacing: .02em; }
+.prod.promo { background: var(--mustard); }
+.prod.activo { background: var(--paper); box-shadow: var(--shadow-md); }
+.prod.promo.activo { background: var(--mustard); }
+.prod.activo output { color: var(--rust-deep); }
+.prod-chip { position: absolute; top: -12px; right: 14px; transform: rotate(8deg); font: 800 12px/1 var(--font-body); letter-spacing: .06em; text-transform: uppercase; color: var(--paper); background: var(--rust-deep); border: 2px solid var(--ink); border-radius: 999px; padding: 4px 9px 3px; box-shadow: 2px 2px 0 var(--ink); }
+.stepper { gap: 8px; }
+.stepper button { width: 44px; height: 44px; font-size: 22px; color: var(--ink); }
+.stepper button:focus-visible { outline: 3px solid var(--rust-deep); outline-offset: 2px; }
+.pestanas button:focus-visible { outline: 3px solid var(--mustard); outline-offset: -4px; }
+
+/* Mis pedidos: mientras Mariana revisa el pago, mostaza; rosado solo cuando falta algo del cliente */
+.pedido.revisando { background: var(--paper); }
+.pedido.revisando::before { background: var(--mustard); }

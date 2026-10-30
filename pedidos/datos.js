@@ -39,6 +39,7 @@ function storeLocal() {
     escucharFicha(uid, cb) { escuchar((d) => cb(d.clientes.find((c) => c.id === uid) || null)); },
     escucharPedidos(uid, cb) { escuchar((d) => cb(d.pedidos.filter((p) => p.uid === uid))); },
     escucharPrecios(cb) { escuchar((d) => cb(d.config.find((c) => c.id === "precios") || null)); },
+    escucharTienda(cb) { escuchar((d) => cb(d.config.find((c) => c.id === "tienda") || d.config.find((c) => c.id === "precios") || null)); },
     async guardarFicha(uid, ficha) {
       escribir((d) => {
         const i = d.clientes.findIndex((c) => c.id === uid);
@@ -67,14 +68,15 @@ async function storeFirebase() {
   const a = auth.getAuth(app);
   a.languageCode = "es";
   const db = fs.getFirestore(app);
-  const errorLectura = (que) => (e) => { console.error(e); alert("No se pudo leer " + que + ": " + e.message); };
+  const errorLectura = (que) => (e) => { console.error(e); alert("No pudimos cargar " + que + ". Revisa tu conexión y vuelve a abrir la página."); };
 
   return {
     estadoSesion(cb) { auth.onAuthStateChanged(a, cb); },
     // El popup debe abrirse dentro del toque del botón
     entrarConGoogle() { return auth.signInWithPopup(a, new auth.GoogleAuthProvider()); },
-    async enviarEnlace(correo) {
-      await auth.sendSignInLinkToEmail(a, correo, { url: location.origin + location.pathname, handleCodeInApp: true });
+    // extra: lo que se pegue a la dirección del enlace (el carrito), por si se abre en otro navegador
+    async enviarEnlace(correo, extra) {
+      await auth.sendSignInLinkToEmail(a, correo, { url: location.origin + location.pathname + (extra ? "?" + extra : ""), handleCodeInApp: true });
       localStorage.setItem(LLAVE_CORREO, correo);
     },
     // Si la página se abrió desde el enlace del correo, termina de entrar
@@ -103,6 +105,10 @@ async function storeFirebase() {
     },
     escucharPrecios(cb) {
       fs.onSnapshot(fs.doc(db, "config", "precios"), (s) => cb(s.exists() ? s.data() : null), errorLectura("los precios"));
+    },
+    // La vitrina, sin entrar: si no se puede leer, la tienda muestra los precios de negocio.js
+    escucharTienda(cb) {
+      fs.onSnapshot(fs.doc(db, "config", "tienda"), (s) => cb(s.exists() ? s.data() : null), (e) => { console.warn(e); cb(null); });
     },
     async guardarFicha(uid, ficha) { await fs.setDoc(fs.doc(db, "clientes", uid), ficha, { merge: true }); },
     async crearPedido(p) { const ref = await fs.addDoc(fs.collection(db, "pedidos"), p); return ref.id; },

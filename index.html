@@ -36,6 +36,7 @@
         <p class="marca-t cc-outline-sm">Cerdísimo</p>
         <p class="marca-s">Pedidos</p>
       </div>
+      <button class="btn-mini" id="entrar" hidden>Entrar</button>
       <button class="btn-mini" id="salir" hidden>Salir</button>
     </div>
     <nav class="pestanas" role="tablist" id="pestanas" hidden>
@@ -50,13 +51,18 @@
   <main>
     <div class="cargando" id="cargando">Cargando…</div>
 
-    <!-- ===== Entrar ===== -->
+    <!-- ===== Entrar: se llega desde la vitrina al hacer el pedido o con el botón Entrar ===== -->
     <section class="vista" id="vista-login" hidden>
-      <div class="hero">
-        <p class="eyebrow">Chorizos artesanales</p>
-        <h1 class="titulo">Pide para el viernes</h1>
-        <p>Entra una vez, guarda tu dirección y pide en un minuto. Pagas con Nequi y te llega el viernes.</p>
+      <div class="barra">
+        <button class="btn-mini" id="login-volver" aria-label="Volver a la tienda">◀</button>
+        <div class="barra-t">
+          <p class="eyebrow">Último paso</p>
+          <h1 class="titulo">Entra para pedir</h1>
+        </div>
       </div>
+      <p class="tarjeta login-carrito" id="login-carrito" hidden></p>
+      <p class="login-intro">Entras una sola vez: guardamos tu dirección y la próxima vez pides en un minuto. Pagas con Nequi y te llega el viernes.</p>
+      <p class="aviso aviso-dentro" id="login-instagram" hidden>Estás en el navegador de Instagram y ahí Google no deja entrar. Entra con tu correo, o toca ⋯ arriba y abre esta página en tu navegador.</p>
       <div class="tarjeta form">
         <button class="btn btn-grande" id="entrar-google">Entrar con Google</button>
         <p class="o">o con tu correo, sin contraseña</p>
@@ -71,18 +77,33 @@
       </div>
     </section>
 
-    <!-- ===== Pedir ===== -->
+    <!-- ===== Pedir: la vitrina, que se ve sin entrar ===== -->
     <section class="vista" id="vista-pedir" hidden>
-      <div class="barra">
-        <div class="barra-t">
-          <p class="eyebrow" id="saludo">Hola</p>
-          <h1 class="titulo">¿Qué te llevamos?</h1>
+      <div class="portada" id="portada">
+        <figure class="foto">
+          <div class="foto-marco"><img src="assets/chorizos.jpg" width="720" height="440" alt="Chorizos Cerdísimo Chancho empacados al vacío, cinco por paquete"></div>
+          <div class="sello" aria-hidden="true">
+            <svg viewBox="0 0 100 100"><polygon points="50.0,3.0 57.6,11.7 68.0,6.6 71.7,17.6 83.2,16.8 82.4,28.3 93.4,32.0 88.3,42.4 97.0,50.0 88.3,57.6 93.4,68.0 82.4,71.7 83.2,83.2 71.7,82.4 68.0,93.4 57.6,88.3 50.0,97.0 42.4,88.3 32.0,93.4 28.3,82.4 16.8,83.2 17.6,71.7 6.6,68.0 11.7,57.6 3.0,50.0 11.7,42.4 6.6,32.0 17.6,28.3 16.8,16.8 28.3,17.6 32.0,6.6 42.4,11.7"/></svg>
+            <span class="sello-t"><b>100%</b>cerdo</span>
+          </div>
+        </figure>
+        <div class="portada-t">
+          <p class="eyebrow" id="saludo">Chorizos artesanales</p>
+          <h1 class="titulo" id="portada-titulo">Pide para el viernes</h1>
+          <p class="portada-p">Cerdo y nada más: 70% carne magra, 30% tocino y cero conservantes. Cinco chorizos por paquete, al vacío.</p>
         </div>
       </div>
-      <!-- Preventa de la chorizada en Dogstar: se muestra hasta el corte del jueves antes del evento -->
-      <form class="tarjeta evento" id="f-evento" hidden>
-        <p class="eyebrow">Preventa · solo en la app</p>
-        <h2 class="evento-t">La Chorizada Real</h2>
+      <p class="aviso aviso-dentro" id="pedir-sigue" hidden>Tu pedido sigue aquí. Revísalo y toca «Hacer pedido».</p>
+      <!-- Preventa de La Chorizada Real: franja que se abre al tocarla, hasta el cierre de la preventa -->
+      <details class="franja-evento" id="evento-caja" hidden>
+        <summary>
+          <span class="franja-txt">
+            <span class="franja-t">La Chorizada Real</span>
+            <span class="franja-s" id="evento-resumen"></span>
+          </span>
+          <span class="franja-ver" aria-hidden="true"></span>
+        </summary>
+      <form class="evento" id="f-evento">
         <p class="evento-cuando" id="evento-cuando"></p>
         <p class="evento-precio"><span id="evento-precio">$10.000</span> el choripán <small id="evento-sitio">(en la carpa vale $12.000)</small></p>
         <div class="prod" id="evento-prod">
@@ -97,6 +118,7 @@
         <p class="error" id="evento-error"></p>
         <button class="btn btn-grande" id="evento-btn" disabled>Comprar preventa</button>
       </form>
+      </details>
       <p class="entrega-info" id="entrega-info"></p>
       <form id="f-pedir" class="form">
         <fieldset class="productos" id="productos"></fieldset>
