@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ajustes del arqueo</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#9a4526">
+  <link rel="icon" href="../assets/icono.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Luckiest+Guy&family=Shrikhand&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <!-- Ajuste de un solo uso (arqueo del 2 de noviembre de 2026): no está enlazado desde la app. -->
+  <header class="cabecera">
+    <div class="cabecera-in">
+      <img class="logo" src="../assets/logo.png" alt="Cerdísimo Chancho">
+      <div class="marca">
+        <p class="marca-t cc-outline-sm">Cerdísimo</p>
+        <p class="marca-s">Mantenimiento</p>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="cargando" id="cargando">Cargando…</div>
+
+    <section id="contenido" hidden>
+      <div class="barra">
+        <div class="barra-t">
+          <p class="eyebrow">Ajuste de un solo uso</p>
+          <h1 class="titulo">Arqueo del 2 de noviembre</h1>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <p>Hace los dos ajustes del arqueo:</p>
+        <ul id="lista"></ul>
+        <dl class="cuentas" id="resumen"></dl>
+      </div>
+
+      <p class="error" id="error"></p>
+      <p class="aviso" id="hecho" hidden></p>
+      <div class="botonera">
+        <a class="btn btn-sec" href="../admin/">Volver a la app</a>
+        <button class="btn" id="aplicar" type="button">Hacer los ajustes</button>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="d-login" class="dialogo">
+    <div class="form">
+      <h2 class="dialogo-t">Entrar</h2>
+      <p>Entra con la cuenta de Google de Daniel o de Mariana.</p>
+      <button class="btn" id="login-btn">Entrar con Google</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="arqueo-2026-11-02.js"></script>
+</body>
+</html>
