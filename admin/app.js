@@ -5,7 +5,7 @@ import {
   enlaceGoogle, enlaceApple, enlaceWhatsApp, ordenarDesdeElNorte, ordenDeReparto, enlaceRutaGoogle,
   necesidadesEntrega, viernesConPedidos, ESTADOS, venceAlCorte, pasoElCorte, codigoPedido, saldoNequi, cuentaFabrica,
   bodega, promedioEntregas, inicioBodega,
-  TODOS_PRODUCTOS, CHORIPANES, EVENTO, esDelEvento, resumenEvento, RECETA_CHORIPAN, cantidadReceta
+  TODOS_PRODUCTOS, CHORIPANES, EVENTO, esDelEvento, resumenEvento, RECETA_CHORIPAN, cantidadReceta, FORMAS_PAGO
 } from "../negocio.js";
 import { reciboFabricaPDF, numeroRecibo, nombreArchivo } from "./recibo.js";
 
@@ -852,7 +852,7 @@ const NOMBRE_MOV = { gasto: "Gasto", liquidacion: "Liquidación", inversion: "In
 // Detalle de un movimiento en la tabla del mes
 function detalleMov(m) {
   if (m.tipo === "gasto") return [m.categoria, m.descripcion];
-  if (m.tipo === "proveedor") return [m.proveedor, m.paquetes ? m.paquetes + " " + plural(Number(m.paquetes), "paquete", "paquetes") : "", m.descripcion];
+  if (m.tipo === "proveedor") return [m.proveedor, m.paquetes ? m.paquetes + " " + plural(Number(m.paquetes), "paquete", "paquetes") : "", FORMAS_PAGO[m.formaPago], m.descripcion];
   return [m.socio || (m.tipo === "inversion" ? "Ambos socios" : ""), esDelEvento(m) ? "Dogstar" : "", m.descripcion];
 }
 
@@ -971,33 +971,41 @@ function pintarNequiYFabrica(s) {
   $("#c-fabrica-pagos").innerHTML = "<thead><tr><th>Fecha</th><th class=num>Paq.</th><th class=num>Monto</th><th></th></tr></thead><tbody>" +
     f.pagos.map((x) => "<tr><td>" + fechaCorta(x.fecha) + (x.descripcion ? '<br><span class="nota">' + esc(x.descripcion) + "</span>" : "") +
       (veces[clave(x)] > 1 ? '<br><span class="tag rojo">¿Repetido?</span>' : "") +
+      (FORMAS_PAGO[x.formaPago] ? '<br><span class="nota">' + FORMAS_PAGO[x.formaPago] + "</span>" : "") +
       '<br><button class="btn-mini btn-recibo" data-acc="recibo" data-id="' + esc(x.id) + '" aria-label="Recibo N.º ' + numeroRecibo(x, f.pagos) + ' en PDF">Recibo</button>' +
       '</td><td class="num">' + x.paquetes + '</td><td class="num">' + plata(x.monto) + '</td><td class="acciones">' + botonesMov(x) + "</td></tr>").join("") + "</tbody>";
 }
 
 // ---------- Recibo en PDF de un pago a la fábrica ----------
 // Hoja carta con dos copias (nosotros y la fábrica). Se arma en el navegador al tocar «Recibo».
-let reciboURL = null, reciboArchivo = null, reciboVez = 0;
+let reciboURL = null, reciboArchivo = null, reciboVez = 0, reciboId = null;
 function soltarRecibo() {
   if (reciboURL) URL.revokeObjectURL(reciboURL);
   reciboURL = reciboArchivo = null;
+  $("#rc-abrir").hidden = $("#rc-compartir").hidden = true;
 }
-async function abrirRecibo(id) {
+function abrirRecibo(id) {
   const f = fabrica();
   const pago = f.pagos.find((x) => x.id === id);
   if (!pago) return;
-  const vez = ++reciboVez;
-  soltarRecibo();
+  reciboId = id;
   $("#rc-titulo").textContent = "Recibo N.º " + numeroRecibo(pago, f.pagos);
   $("#rc-resumen").textContent = fechaCorta(pago.fecha) + " · " + paqTxt(pago.paquetes) + " · " + plata(pago.monto);
-  $("#rc-estado").textContent = "Armando el PDF…";
+  $("#rc-forma").value = FORMAS_PAGO[pago.formaPago] ? pago.formaPago : "";
   $("#rc-error").textContent = "";
-  $("#rc-abrir").hidden = $("#rc-compartir").hidden = true;
   $("#d-recibo").showModal();
+  armarRecibo(pago, f.pagos);
+}
+// Arma el PDF; si el pago no tiene forma de pago (los de antes), primero la piden
+async function armarRecibo(pago, pagos) {
+  const vez = ++reciboVez;
+  soltarRecibo();
+  if (!FORMAS_PAGO[pago.formaPago]) { $("#rc-estado").textContent = "Elige la forma de pago para armar el recibo."; return; }
+  $("#rc-estado").textContent = "Armando el PDF…";
   try {
-    const blob = await reciboFabricaPDF(pago, f.pagos);
+    const blob = await reciboFabricaPDF(pago, pagos);
     if (vez !== reciboVez || !$("#d-recibo").open) return;
-    const nombre = nombreArchivo(pago, f.pagos);
+    const nombre = nombreArchivo(pago, pagos);
     reciboURL = URL.createObjectURL(blob);
     reciboArchivo = new File([blob], nombre, { type: "application/pdf" });
     const a = $("#rc-abrir");
@@ -1013,10 +1021,21 @@ async function abrirRecibo(id) {
     $("#rc-error").textContent = "No se pudo armar el recibo: " + x.message;
   }
 }
+// Cambiar la forma de pago desde el recibo la guarda en el pago y vuelve a armar el PDF
+$("#rc-forma").addEventListener("change", async () => {
+  const forma = $("#rc-forma").value;
+  const f = fabrica();
+  const pago = f.pagos.find((x) => x.id === reciboId);
+  if (!pago || !FORMAS_PAGO[forma]) return;
+  $("#rc-error").textContent = "";
+  armarRecibo({ ...pago, formaPago: forma }, f.pagos.map((x) => (x.id === pago.id ? { ...x, formaPago: forma } : x)));
+  try { await store.actualizar("movimientos", pago.id, { formaPago: forma, editado: new Date().toISOString() }); }
+  catch (x) { $("#rc-error").textContent = "El recibo sale bien, pero no se pudo guardar la forma de pago: " + x.message; }
+});
 $("#rc-compartir").addEventListener("click", () => {
   if (reciboArchivo) navigator.share({ files: [reciboArchivo], title: $("#rc-titulo").textContent }).catch(() => {});
 });
-$("#d-recibo").addEventListener("close", () => { reciboVez++; soltarRecibo(); });
+$("#d-recibo").addEventListener("close", () => { reciboVez++; reciboId = null; soltarRecibo(); });
 
 // ---------- Pago a proveedor ----------
 // Solo la fábrica y la licorera: lo que se les paga ya se resta de la ganancia con el costo por paquete
@@ -1040,6 +1059,8 @@ function abrirProveedor(mov) {
   $("#pv-paq").value = mov ? (Number(mov.paquetes) || "") : (fabrica().deben || "");
   $("#pv-monto").value = mov ? plata(Number(mov.monto) || 0) : "";
   $("#pv-fecha").value = mov ? mov.fecha || hoyISO() : hoyISO();
+  // A la fábrica casi siempre se le paga en efectivo; los pagos viejos no la tienen y piden elegirla
+  $("#pv-forma").value = mov ? (FORMAS_PAGO[mov.formaPago] ? mov.formaPago : "") : "efectivo";
   $("#pv-desc").value = mov ? mov.descripcion || "" : "";
   $("#pv-error").textContent = "";
   $("#pv-guardar").disabled = false;
@@ -1065,7 +1086,7 @@ function formaProveedor() {
   $("#pv-error").textContent = "";
   // Un campo escondido no debe frenar el Guardar: deshabilitado, el navegador no lo valida
   $("#pv-campos").hidden = !prov;
-  ["#pv-paq", "#pv-monto", "#pv-fecha", "#pv-desc"].forEach((sel) => { $(sel).disabled = !prov; });
+  ["#pv-paq", "#pv-monto", "#pv-fecha", "#pv-forma", "#pv-desc"].forEach((sel) => { $(sel).disabled = !prov; });
   $("#pv-paq-l").hidden = !esFabrica;
   $("#pv-paq").disabled = !esFabrica;
   $("#pv-paq").required = esFabrica;
@@ -1103,10 +1124,11 @@ $("#f-proveedor").addEventListener("submit", async (e) => {
   const paquetes = esFabrica ? Number($("#pv-paq").value) : 0;
   if (esFabrica && !(Number.isInteger(paquetes) && paquetes >= 1)) { $("#pv-error").textContent = "Escribe cuántos paquetes se pagan."; return; }
   if (!monto) { $("#pv-error").textContent = "Escribe el monto."; return; }
+  if (!FORMAS_PAGO[$("#pv-forma").value]) { $("#pv-error").textContent = "Elige la forma de pago."; return; }
   const d = deudaFabrica();
   if (esFabrica && paquetes > d.deben &&
     !confirm("Se deben " + d.deben + " " + plural(d.deben, "paquete", "paquetes") + " y vas a pagar " + paquetes + ". ¿Guardar los demás como pagados por adelantado?")) return;
-  const campos = { tipo: "proveedor", proveedor: prov.nombre, monto, fecha: $("#pv-fecha").value, descripcion: $("#pv-desc").value.trim(), paquetes };
+  const campos = { tipo: "proveedor", proveedor: prov.nombre, monto, fecha: $("#pv-fecha").value, formaPago: $("#pv-forma").value, descripcion: $("#pv-desc").value.trim(), paquetes };
   // Un solo pago por toque: mientras se guarda, el botón no vuelve a guardar
   if ($("#pv-guardar").disabled) return;
   $("#pv-guardar").disabled = true;

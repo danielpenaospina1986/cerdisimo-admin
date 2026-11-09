@@ -2,7 +2,7 @@
 // Una hoja carta con dos copias iguales (una para nosotros y otra para la fábrica), línea para
 // recortar y espacio para las firmas. El PDF se arma en el navegador con jsPDF (admin/vendor)
 // y las letras de la marca (assets/fuentes), sin mandar nada a ningún servidor.
-import { plata, fechaLarga, fechaCorta, CHORIZOS_POR_PAQUETE } from "../negocio.js";
+import { plata, fechaLarga, fechaCorta, CHORIZOS_POR_PAQUETE, FORMAS_PAGO } from "../negocio.js";
 
 const TINTA = "#1a110d", OXIDO = "#ac5531", OXIDO_OSCURO = "#9a4526", MOSTAZA = "#f0c870", CREMA = "#f6e7cc", GRIS = "#5c4a40";
 const ANCHO = 215.9, ALTO = 279.4, MITAD = ALTO / 2, X0 = 14, X1 = ANCHO - 14; // carta, en milímetros
@@ -93,6 +93,7 @@ export async function reciboFabricaPDF(pago, pagos, { hoy = new Date(), pagadoA 
     paquetes: Number(pago.paquetes) || 0,
     monto: Number(pago.monto) || 0,
     nota: (pago.descripcion || "").trim(),
+    formaPago: FORMAS_PAGO[pago.formaPago] || "",
     historial: hasta,
     generado: hoy,
   };
@@ -134,7 +135,7 @@ function copia(doc, r, y0, d, etiqueta) {
   dato("Fecha del pago", d.fecha.charAt(0).toUpperCase() + d.fecha.slice(1), X0, y0 + 41);
   dato("Pagado a", d.pagadoA, xDer, y0 + 41);
   dato("Pagado por", "Cerdísimo Chancho (Daniel y Mariana)", X0, y0 + 52);
-  dato("Forma de pago", "Nequi", xDer, y0 + 52);
+  dato("Forma de pago", d.formaPago || "_______________", xDer, y0 + 52);
 
   // Detalle: paquetes, valor por paquete y total
   const yt = y0 + 60;

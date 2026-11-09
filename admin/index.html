@@ -366,6 +366,14 @@
           <input class="campo" id="pv-monto" inputmode="numeric" required placeholder="$0">
         </label>
         <label class="etq">Fecha <input class="campo" id="pv-fecha" type="date" required></label>
+        <label class="etq">Forma de pago
+          <select class="campo" id="pv-forma" required>
+            <option value="" disabled>Elige cómo se pagó</option>
+            <option value="efectivo">Efectivo</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="nequi">Nequi</option>
+          </select>
+        </label>
         <label class="etq">Descripción <input class="campo" id="pv-desc" placeholder="Opcional"></label>
         <p class="nota" id="pv-nota"></p>
       </div>
@@ -382,6 +390,14 @@
     <form method="dialog" class="form">
       <h2 class="dialogo-t" id="rc-titulo">Recibo</h2>
       <p class="nota fuerte" id="rc-resumen"></p>
+      <label class="etq">Forma de pago
+        <select class="campo" id="rc-forma">
+          <option value="" disabled>Elige cómo se pagó</option>
+          <option value="efectivo">Efectivo</option>
+          <option value="transferencia">Transferencia</option>
+          <option value="nequi">Nequi</option>
+        </select>
+      </label>
       <p class="nota" id="rc-estado"></p>
       <p class="error" id="rc-error"></p>
       <p class="nota">Sale en hoja carta con dos copias iguales, una para ustedes y otra para la fábrica: córtala por la línea y firmen las dos.</p>
