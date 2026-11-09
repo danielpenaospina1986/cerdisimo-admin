@@ -231,7 +231,7 @@ export function cuentaFabrica(pedidos, movimientos, hasta, costoPaquete) {
   const pedidosFabrica = porPedido + recibidos;
   const pagos = movimientos
     .filter((m) => m.tipo === "proveedor" && Number(m.paquetes) > 0)
-    .map((m) => ({ id: m.id, tipo: m.tipo, fecha: m.fecha || "", paquetes: Number(m.paquetes), monto: Number(m.monto) || 0, descripcion: m.descripcion || "", creado: m.creado || "" }))
+    .map((m) => ({ id: m.id, tipo: m.tipo, fecha: m.fecha || "", paquetes: Number(m.paquetes), monto: Number(m.monto) || 0, descripcion: m.descripcion || "", formaPago: m.formaPago || "", creado: m.creado || "" }))
     .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.creado.localeCompare(a.creado));
   const pagados = pagos.reduce((t, m) => t + m.paquetes, 0);
   const deben = Math.max(0, pedidosFabrica - pagados);
@@ -315,6 +315,9 @@ export function enlaceRutaGoogle(ruta) {
 
 // ---------- Inventario / producción ----------
 export const CHORIZOS_POR_PAQUETE = 5;
+
+// Cómo se le pagó a un proveedor: solo para la trazabilidad y el recibo; no cambia las cuentas de Nequi
+export const FORMAS_PAGO = { efectivo: "Efectivo", transferencia: "Transferencia", nequi: "Nequi" };
 
 // ---------- Bodega de chorizos ----------
 // Desde octubre de 2026 la fábrica les deja paquetes para tener en bodega, y se le deben hasta que
