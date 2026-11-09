@@ -200,6 +200,7 @@ code { font-size: 0.9em; }
 .tabla tr.vacia td { text-align: center; color: #6b4a3a; padding: 18px; }
 .tabla .x { background: none; border: none; color: var(--pendiente); font-weight: 800; cursor: pointer; font-size: 16px; padding: 0 4px; }
 .tabla .x.lapiz { color: var(--rust-deep); }
+.tabla .btn-recibo { margin-top: 6px; padding: 6px 10px; font-size: 13px; white-space: nowrap; }
 .tabla td.acciones .x { display: block; margin-left: auto; padding: 4px 6px; } /* uno encima del otro: la tabla no se ensancha en el celular */
 .tabla-clientes tbody tr { cursor: pointer; }
 .tabla-clientes tbody tr:hover { background: var(--cream); }

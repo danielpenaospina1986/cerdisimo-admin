@@ -7,6 +7,7 @@ import {
   bodega, promedioEntregas, inicioBodega,
   TODOS_PRODUCTOS, CHORIPANES, EVENTO, esDelEvento, resumenEvento, RECETA_CHORIPAN, cantidadReceta
 } from "../negocio.js";
+import { reciboFabricaPDF, numeroRecibo, nombreArchivo } from "./recibo.js";
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -332,6 +333,7 @@ document.addEventListener("click", async (e) => {
     const despues = inicioBodega(datos.movimientos.filter((x) => x.id !== id));
     if (confirm("¿Borrar " + que + "? No se puede deshacer." + (antes !== despues ? "\n\n" + avisoInicio(antes, despues) : ""))) await store.borrar("movimientos", id);
   }
+  if (b.dataset.acc === "recibo") abrirRecibo(id);
   if (b.dataset.acc === "editar-mov") {
     const m = datos.movimientos.find((x) => x.id === id);
     if (m && (m.tipo === "proveedor" || m.paquetes)) abrirProveedor(m);
@@ -969,8 +971,52 @@ function pintarNequiYFabrica(s) {
   $("#c-fabrica-pagos").innerHTML = "<thead><tr><th>Fecha</th><th class=num>Paq.</th><th class=num>Monto</th><th></th></tr></thead><tbody>" +
     f.pagos.map((x) => "<tr><td>" + fechaCorta(x.fecha) + (x.descripcion ? '<br><span class="nota">' + esc(x.descripcion) + "</span>" : "") +
       (veces[clave(x)] > 1 ? '<br><span class="tag rojo">¿Repetido?</span>' : "") +
+      '<br><button class="btn-mini btn-recibo" data-acc="recibo" data-id="' + esc(x.id) + '" aria-label="Recibo N.º ' + numeroRecibo(x, f.pagos) + ' en PDF">Recibo</button>' +
       '</td><td class="num">' + x.paquetes + '</td><td class="num">' + plata(x.monto) + '</td><td class="acciones">' + botonesMov(x) + "</td></tr>").join("") + "</tbody>";
 }
+
+// ---------- Recibo en PDF de un pago a la fábrica ----------
+// Hoja carta con dos copias (nosotros y la fábrica). Se arma en el navegador al tocar «Recibo».
+let reciboURL = null, reciboArchivo = null, reciboVez = 0;
+function soltarRecibo() {
+  if (reciboURL) URL.revokeObjectURL(reciboURL);
+  reciboURL = reciboArchivo = null;
+}
+async function abrirRecibo(id) {
+  const f = fabrica();
+  const pago = f.pagos.find((x) => x.id === id);
+  if (!pago) return;
+  const vez = ++reciboVez;
+  soltarRecibo();
+  $("#rc-titulo").textContent = "Recibo N.º " + numeroRecibo(pago, f.pagos);
+  $("#rc-resumen").textContent = fechaCorta(pago.fecha) + " · " + paqTxt(pago.paquetes) + " · " + plata(pago.monto);
+  $("#rc-estado").textContent = "Armando el PDF…";
+  $("#rc-error").textContent = "";
+  $("#rc-abrir").hidden = $("#rc-compartir").hidden = true;
+  $("#d-recibo").showModal();
+  try {
+    const blob = await reciboFabricaPDF(pago, f.pagos);
+    if (vez !== reciboVez || !$("#d-recibo").open) return;
+    const nombre = nombreArchivo(pago, f.pagos);
+    reciboURL = URL.createObjectURL(blob);
+    reciboArchivo = new File([blob], nombre, { type: "application/pdf" });
+    const a = $("#rc-abrir");
+    a.href = reciboURL;
+    // Donde el navegador no muestra PDF (Chrome en Android), se descarga con su nombre y se abre desde ahí
+    if (navigator.pdfViewerEnabled === false) a.download = nombre; else a.removeAttribute("download");
+    a.hidden = false;
+    $("#rc-compartir").hidden = !(navigator.canShare && navigator.canShare({ files: [reciboArchivo] }));
+    $("#rc-estado").textContent = "Listo. Ábrelo para imprimirlo, o compártelo para mandarlo por WhatsApp o imprimir desde el celular.";
+  } catch (x) {
+    if (vez !== reciboVez) return;
+    $("#rc-estado").textContent = "";
+    $("#rc-error").textContent = "No se pudo armar el recibo: " + x.message;
+  }
+}
+$("#rc-compartir").addEventListener("click", () => {
+  if (reciboArchivo) navigator.share({ files: [reciboArchivo], title: $("#rc-titulo").textContent }).catch(() => {});
+});
+$("#d-recibo").addEventListener("close", () => { reciboVez++; soltarRecibo(); });
 
 // ---------- Pago a proveedor ----------
 // Solo la fábrica y la licorera: lo que se les paga ya se resta de la ganancia con el costo por paquete

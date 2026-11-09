@@ -377,6 +377,22 @@
     </form>
   </dialog>
 
+  <!-- Recibo en PDF de un pago a la fábrica -->
+  <dialog id="d-recibo" class="dialogo">
+    <form method="dialog" class="form">
+      <h2 class="dialogo-t" id="rc-titulo">Recibo</h2>
+      <p class="nota fuerte" id="rc-resumen"></p>
+      <p class="nota" id="rc-estado"></p>
+      <p class="error" id="rc-error"></p>
+      <p class="nota">Sale en hoja carta con dos copias iguales, una para ustedes y otra para la fábrica: córtala por la línea y firmen las dos.</p>
+      <div class="botonera">
+        <button class="btn btn-sec" value="cerrar">Cerrar</button>
+        <button class="btn btn-sec" type="button" id="rc-compartir" hidden>Compartir</button>
+        <a class="btn" id="rc-abrir" target="_blank" rel="noopener" hidden>Abrir PDF</a>
+      </div>
+    </form>
+  </dialog>
+
   <!-- Movimiento: gasto, liquidación o inversión -->
   <dialog id="d-mov" class="dialogo">
     <form method="dialog" id="f-mov" class="form">
