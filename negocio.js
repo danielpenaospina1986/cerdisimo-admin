@@ -37,8 +37,27 @@ export const EVENTO = {
   // La preventa cierra el sábado antes del evento, para tener la semana para producir (Daniel, 25 oct)
   cierre: "2026-11-14",
   cierreTexto: "a las 11:59 p. m.",
-  planeados: 125 // choripanes que se piensan llevar, si no se ha guardado otro número en la pestaña Dogstar
+  planeados: 125, // choripanes que se piensan llevar, si no se ha guardado otro número en la pestaña Dogstar
+  // El 12 nov Daniel cerró la preventa: el precio del choripán cambia y la tienda ya no lo muestra.
+  // Las preventas que ya se hicieron se respetan. En su lugar, la tienda pregunta quién va (asistentes).
+  preventa: false,
+  asistencia: 0.6 // parte de los confirmados que se cree que llega, si no se ha guardado otra en la pestaña Dogstar
 };
+// La tienda pregunta "¿Vas a ir?" hasta que termina el día del evento
+export function confirmarAbierto(ahora = new Date()) {
+  const d = deISO(EVENTO.fecha);
+  d.setHours(23, 59, 0, 0);
+  return ahora < d;
+}
+// Quienes confirmaron (colección asistentes, un documento por cuenta) y cuántos choripanes dicen que se comen
+export function resumenAsistentes(asistentes) {
+  const del = (asistentes || []).filter((a) => a.evento === EVENTO.id);
+  const van = del.filter((a) => a.va !== false);
+  return {
+    van, noVan: del.filter((a) => a.va === false),
+    choripanes: van.reduce((t, a) => t + (Number(a.choripanes) || 0), 0)
+  };
+}
 // Lo que lleva cada choripán, para calcular cuánto comprar. Va aparte de los paquetes de los
 // pedidos normales: el evento no se mezcla con Producción ni con la cuenta de la fábrica.
 export const RECETA_CHORIPAN = [
@@ -90,7 +109,7 @@ export function cierrePreventa() {
   d.setHours(23, 59, 0, 0);
   return d;
 }
-export const preventaAbierta = (ahora = new Date()) => ahora < cierrePreventa();
+export const preventaAbierta = (ahora = new Date()) => EVENTO.preventa !== false && ahora < cierrePreventa();
 
 export const SOCIOS = ["Daniel", "Mariana"];
 

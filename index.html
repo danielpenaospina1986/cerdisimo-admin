@@ -80,6 +80,29 @@
 
     <!-- ===== Pedir: la vitrina, que se ve sin entrar ===== -->
     <section class="vista" id="vista-pedir" hidden>
+      <!-- ¿Vas a ir a La Chorizada Real? Quien dice que sí entra con Google y queda en la lista (asistentes) -->
+      <section class="asis" id="asis-caja" hidden aria-labelledby="asis-t">
+        <div class="asis-cab">
+          <p class="asis-eyebrow">Viernes 20 de noviembre · Dogstar</p>
+          <h2 class="asis-t" id="asis-t">¿Vas a ir a La Chorizada Real?</h2>
+        </div>
+        <form class="asis-cuerpo" id="f-asis">
+          <p class="asis-p" id="asis-p"></p>
+          <div class="prod" id="asis-prod">
+            <div class="prod-n" id="asis-pregunta">¿Cuántos choripanes crees que te comes?<small>Allá los vamos a vender. Con esto calculamos cuántos llevar.</small></div>
+            <div class="stepper">
+              <button type="button" data-paso-asis="-1" aria-label="Uno menos">−</button>
+              <output id="asis-n">1</output>
+              <button type="button" data-paso-asis="1" aria-label="Uno más">+</button>
+            </div>
+          </div>
+          <label class="check asis-permiso" id="asis-permiso-l"><input type="checkbox" id="asis-permiso"> Acepto que Cerdísimo Chancho guarde mi nombre y mi correo y me escriba sobre sus eventos y pedidos.</label>
+          <p class="error" id="asis-error"></p>
+          <button class="btn btn-grande" id="asis-btn">¡Sí, voy!</button>
+          <p class="asis-nota" id="asis-nota">Entras con tu cuenta de Google y quedas en la lista. No pagas nada.</p>
+          <button type="button" class="enlace asis-no" id="asis-no" hidden>Ya no puedo ir</button>
+        </form>
+      </section>
       <div class="portada" id="portada">
         <figure class="foto">
           <div class="foto-marco"><img src="assets/chorizos.jpg" width="720" height="440" alt="Chorizos Cerdísimo Chancho empacados al vacío, cinco por paquete"></div>

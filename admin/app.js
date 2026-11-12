@@ -5,7 +5,8 @@ import {
   enlaceGoogle, enlaceApple, enlaceWhatsApp, ordenarDesdeElNorte, ordenDeReparto, enlaceRutaGoogle,
   necesidadesEntrega, viernesConPedidos, ESTADOS, venceAlCorte, pasoElCorte, codigoPedido, saldoNequi, cuentaFabrica,
   bodega, promedioEntregas, inicioBodega,
-  TODOS_PRODUCTOS, CHORIPANES, EVENTO, esDelEvento, resumenEvento, RECETA_CHORIPAN, cantidadReceta, FORMAS_PAGO
+  TODOS_PRODUCTOS, CHORIPANES, EVENTO, esDelEvento, resumenEvento, RECETA_CHORIPAN, cantidadReceta, FORMAS_PAGO,
+  resumenAsistentes
 } from "../negocio.js";
 import { reciboFabricaPDF, numeroRecibo, nombreArchivo } from "./recibo.js";
 
@@ -1542,6 +1543,50 @@ const planeados = () => {
   return doc && Number(doc.planeados) > 0 ? Number(doc.planeados) : EVENTO.planeados;
 };
 const choris = (n) => n + (n === 1 ? " choripán" : " choripanes");
+// Parte de los confirmados que se cree que llega (0 a 1)
+const asistenciaEsperada = () => {
+  const doc = datos.config.find((c) => c.id === "evento");
+  const v = doc ? Number(doc.asistencia) : NaN;
+  return v > 0 && v <= 1 ? v : EVENTO.asistencia;
+};
+// Lo que se sugiere llevar: los choripanes que dicen los confirmados por la parte que llega, en paquetes de 5
+const sugeridoLlevar = (ra) => Math.ceil((ra.choripanes * asistenciaEsperada()) / 5) * 5;
+
+function pintarAsistentes() {
+  if (datos.asistentes === null) {
+    $("#as-resumen").innerHTML = "";
+    $("#as-sugerido").innerHTML = "<strong>Falta pegar las reglas nuevas de Firebase</strong> para ver quién confirmó.";
+    $("#as-usar").hidden = true;
+    $("#as-lista").innerHTML = "";
+    $("#as-csv").hidden = true;
+    return;
+  }
+  const ra = resumenAsistentes(datos.asistentes);
+  const pct = Math.round(asistenciaEsperada() * 100);
+  const sug = sugeridoLlevar(ra);
+  $("#as-resumen").innerHTML =
+    '<span class="chip verde">Dicen que van: ' + ra.van.length + " " + (ra.van.length === 1 ? "persona" : "personas") + "</span>" +
+    '<span class="chip rust">Choripanes que dicen: ' + ra.choripanes + "</span>" +
+    (ra.noVan.length ? '<span class="chip">Ya no van: ' + ra.noVan.length + "</span>" : "");
+  if (document.activeElement !== $("#as-pct")) $("#as-pct").value = pct;
+  $("#as-sugerido").innerHTML = ra.van.length
+    ? "Si llega el " + pct + "% de los confirmados, se comerían unos <strong>" + choris(Math.round(ra.choripanes * asistenciaEsperada())) +
+      "</strong>. Sugerido para llevar: <strong>" + sug + "</strong> (en paquetes de 5), más lo que calculen para quien llegue sin confirmar."
+    : "Todavía nadie ha confirmado desde la tienda.";
+  $("#as-usar").hidden = !sug || sug === planeados();
+  $("#as-usar").textContent = "Llevar " + sug + " choripanes";
+  const q = norm($("#as-buscar").value);
+  const lista = ra.van.concat(ra.noVan)
+    .filter((a) => !q || norm(a.nombre).includes(q) || norm(a.email).includes(q))
+    .sort((a, b) => (a.va === false) - (b.va === false) || (a.nombre || "").localeCompare(b.nombre || ""));
+  $("#as-lista").innerHTML = lista.length
+    ? "<thead><tr><th>Persona</th><th class=num>Choripanes</th></tr></thead><tbody>" +
+      lista.map((a) => "<tr" + (a.va === false ? ' class="listo"' : "") + "><td><strong>" + esc(a.nombre) + "</strong>" + (a.va === false ? " · ya no va" : "") +
+        '<br><span class="nota">' + esc(a.email || "Sin correo") + (a.creadoEn ? " · " + fechaCorta(a.creadoEn.slice(0, 10)) : "") + "</span></td>" +
+        '<td class="num">' + (Number(a.choripanes) || 0) + "</td></tr>").join("") + "</tbody>"
+    : '<tbody><tr class="vacia"><td>' + (q ? "Nadie con ese nombre o correo." : "Todavía no hay confirmados.") + "</td></tr></tbody>";
+  $("#as-csv").hidden = !(ra.van.length + ra.noVan.length);
+}
 
 function tarjetaPreventa(p, r) {
   const c = cliente(p.clienteId) || {};
@@ -1567,6 +1612,7 @@ function tarjetaPreventa(p, r) {
 }
 
 function pintarEvento() {
+  pintarAsistentes();
   const r = resumenEvento(datos.pedidos);
   const p = precios(datos);
   $("#ev-fecha").textContent = fechaLarga(EVENTO.fecha) + " · " + EVENTO.horario;
@@ -1632,6 +1678,33 @@ function pintarEvento() {
 }
 
 $("#ev-buscar").addEventListener("input", pintarEvento);
+$("#as-buscar").addEventListener("input", pintarAsistentes);
+$("#f-asistencia").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const n = leerPlata($("#as-pct").value);
+  if (!(n > 0 && n <= 100)) { alert("Escriba un número de 1 a 100."); return; }
+  await store.fijar("config", "evento", { asistencia: n / 100 });
+  $("#as-pct").blur();
+});
+$("#as-usar").onclick = async () => {
+  const n = sugeridoLlevar(resumenAsistentes(datos.asistentes));
+  if (!n || !confirm("¿Cambiar los choripanes que van a llevar a " + n + "?")) return;
+  await store.fijar("config", "evento", { planeados: n });
+};
+// La lista de confirmados para abrir en Excel o Google Sheets (base de clientes)
+$("#as-csv").onclick = () => {
+  const ra = resumenAsistentes(datos.asistentes);
+  const celda = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+  const filas = [["Nombre", "Correo", "Choripanes", "Va", "Confirmó", "Último cambio"]].concat(
+    ra.van.concat(ra.noVan).map((a) => [a.nombre, a.email, Number(a.choripanes) || 0, a.va === false ? "No" : "Sí",
+      (a.creadoEn || "").slice(0, 16).replace("T", " "), (a.actualizadoEn || "").slice(0, 16).replace("T", " ")]));
+  const blob = new Blob(["\ufeff" + filas.map((f) => f.map(celda).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "chorizada-real-confirmados.csv";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+};
 $("#c-inv-filtro").onchange = () => pintarContabilidad();
 $("#ev-compra").onclick = () => abrirMov("inversion", null, null, true);
 

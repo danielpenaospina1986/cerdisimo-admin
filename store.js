@@ -9,7 +9,7 @@ const COLECCIONES = ["clientes", "pedidos", "movimientos", "config"];
 export const modoPrueba = !firebaseConfig.apiKey;
 
 function vacio() {
-  return { clientes: [], pedidos: [], movimientos: [], config: [] };
+  return { clientes: [], pedidos: [], movimientos: [], config: [], asistentes: [] };
 }
 
 // ---------- Modo prueba (localStorage) ----------
@@ -81,6 +81,11 @@ async function storeFirebase() {
           if (listos.size === COLECCIONES.length) cb(datos, { alDia: delServidor.size === COLECCIONES.length });
         }, (err) => alert("Error leyendo " + col + ": " + err.message));
       });
+      // Quién va a La Chorizada Real: no frena la app si las reglas todavía no lo dejan leer
+      fs.onSnapshot(fs.collection(db, "asistentes"), (snap) => {
+        datos.asistentes = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+        if (listos.size === COLECCIONES.length) cb(datos, { alDia: delServidor.size === COLECCIONES.length });
+      }, (err) => { console.warn("asistentes", err); datos.asistentes = null; });
     },
     async agregar(col, doc) { const ref = await fs.addDoc(fs.collection(db, col), doc); return ref.id; },
     async fijar(col, docId, doc) { await fs.setDoc(fs.doc(db, col, docId), doc, { merge: true }); },
