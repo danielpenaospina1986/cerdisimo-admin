@@ -1543,14 +1543,14 @@ const planeados = () => {
   return doc && Number(doc.planeados) > 0 ? Number(doc.planeados) : EVENTO.planeados;
 };
 const choris = (n) => n + (n === 1 ? " choripán" : " choripanes");
-// Parte de los confirmados que se cree que llega (0 a 1)
-const asistenciaEsperada = () => {
+// Lo que se lleva de más sobre lo que dicen los confirmados, por si acaso (0 a 1)
+const margenEvento = () => {
   const doc = datos.config.find((c) => c.id === "evento");
-  const v = doc ? Number(doc.asistencia) : NaN;
-  return v > 0 && v <= 1 ? v : EVENTO.asistencia;
+  const v = doc ? Number(doc.margen) : NaN;
+  return v >= 0 && v <= 2 ? v : EVENTO.margen;
 };
-// Lo que se sugiere llevar: los choripanes que dicen los confirmados por la parte que llega, en paquetes de 5
-const sugeridoLlevar = (ra) => Math.ceil((ra.choripanes * asistenciaEsperada()) / 5) * 5;
+// Lo que se sugiere llevar: los choripanes que dicen los confirmados más el margen, en paquetes de 5
+const sugeridoLlevar = (ra) => Math.ceil((ra.choripanes * (1 + margenEvento())) / 5) * 5;
 
 function pintarAsistentes() {
   if (datos.asistentes === null) {
@@ -1562,7 +1562,7 @@ function pintarAsistentes() {
     return;
   }
   const ra = resumenAsistentes(datos.asistentes);
-  const pct = Math.round(asistenciaEsperada() * 100);
+  const pct = Math.round(margenEvento() * 100);
   const sug = sugeridoLlevar(ra);
   $("#as-resumen").innerHTML =
     '<span class="chip verde">Dicen que van: ' + ra.van.length + " " + (ra.van.length === 1 ? "persona" : "personas") + "</span>" +
@@ -1570,8 +1570,8 @@ function pintarAsistentes() {
     (ra.noVan.length ? '<span class="chip">Ya no van: ' + ra.noVan.length + "</span>" : "");
   if (document.activeElement !== $("#as-pct")) $("#as-pct").value = pct;
   $("#as-sugerido").innerHTML = ra.van.length
-    ? "Si llega el " + pct + "% de los confirmados, se comerían unos <strong>" + choris(Math.round(ra.choripanes * asistenciaEsperada())) +
-      "</strong>. Sugerido para llevar: <strong>" + sug + "</strong> (en paquetes de 5), más lo que calculen para quien llegue sin confirmar."
+    ? "Los confirmados dicen <strong>" + choris(ra.choripanes) + "</strong>. Con " + pct + "% más por si acaso, hay que llevar <strong>" + choris(sug) +
+      "</strong>: " + sug / 5 + " paquetes de chorizo (redondeado a paquetes de 5)."
     : "Todavía nadie ha confirmado desde la tienda.";
   $("#as-usar").hidden = !sug || sug === planeados();
   $("#as-usar").textContent = "Llevar " + sug + " choripanes";
@@ -1616,7 +1616,10 @@ function pintarEvento() {
   const r = resumenEvento(datos.pedidos);
   const p = precios(datos);
   $("#ev-fecha").textContent = fechaLarga(EVENTO.fecha) + " · " + EVENTO.horario;
-  $("#ev-resumen").innerHTML =
+  const hayPreventas = r.preventas.length > 0;
+  ["#ev-prev-t", "#ev-buscar", "#ev-lista", "#ev-pagaron-caja"].forEach((id) => { const el = $(id); if (el) el.hidden = !hayPreventas; });
+  $("#ev-resumen").hidden = !hayPreventas && !r.vendidosCarpa;
+  $("#ev-resumen").innerHTML = !hayPreventas ? '<span class="chip">Vendidos en la carpa: ' + r.vendidosCarpa + "</span>" :
     '<span class="chip rust">Preventa pagada: ' + choris(r.preventaPagada) + "</span>" +
     (r.preventaSinPagar ? '<span class="chip app">Sin pagar o por verificar: ' + choris(r.preventaSinPagar) + "</span>" : "") +
     '<span class="chip verde">Entregados: ' + r.entregados + " de " + r.preventaPagada + "</span>" +
@@ -1656,9 +1659,11 @@ function pintarEvento() {
 
   const n = planeados();
   if (document.activeElement !== $("#ev-planeados")) $("#ev-planeados").value = n;
-  $("#ev-ingredientes").innerHTML = "<thead><tr><th>Ingrediente</th><th class=num>Preventa (" + r.preventaPagada + ")</th><th class=num>Total (" + n + ")</th></tr></thead><tbody>" +
+  // Primera columna: lo que dicen los confirmados (o la preventa pagada, si la hubo)
+  const base = r.preventas.length ? { t: "Preventa", n: r.preventaPagada } : { t: "Confirmados", n: resumenAsistentes(datos.asistentes).choripanes };
+  $("#ev-ingredientes").innerHTML = "<thead><tr><th>Ingrediente</th><th class=num>" + base.t + " (" + base.n + ")</th><th class=num>Total (" + n + ")</th></tr></thead><tbody>" +
     RECETA_CHORIPAN.map((x) => "<tr><td><strong>" + esc(x.nombre) + "</strong>" + (x.compra ? "<br><small>Comprar " + x.compra(n) + "</small>" : "") +
-      '</td><td class="num">' + cantidadReceta(x, r.preventaPagada) + '</td><td class="num">' + cantidadReceta(x, n) + "</td></tr>").join("") + "</tbody>";
+      '</td><td class="num">' + cantidadReceta(x, base.n) + '</td><td class="num">' + cantidadReceta(x, n) + "</td></tr>").join("") + "</tbody>";
 
   const fila = (a, b, cls) => "<tr" + (cls ? ' class="' + cls + '"' : "") + "><td>" + a + '</td><td class="num">' + b + "</td></tr>";
   const compras = datos.movimientos.filter((m) => m.tipo === "inversion" && esDelEvento(m))
@@ -1682,8 +1687,8 @@ $("#as-buscar").addEventListener("input", pintarAsistentes);
 $("#f-asistencia").addEventListener("submit", async (e) => {
   e.preventDefault();
   const n = leerPlata($("#as-pct").value);
-  if (!(n > 0 && n <= 100)) { alert("Escriba un número de 1 a 100."); return; }
-  await store.fijar("config", "evento", { asistencia: n / 100 });
+  if (!(n >= 0 && n <= 200)) { alert("Escriba un número de 0 a 200."); return; }
+  await store.fijar("config", "evento", { margen: n / 100 });
   $("#as-pct").blur();
 });
 $("#as-usar").onclick = async () => {

@@ -41,7 +41,7 @@ export const EVENTO = {
   // El 12 nov Daniel cerró la preventa: el precio del choripán cambia y la tienda ya no lo muestra.
   // Las preventas que ya se hicieron se respetan. En su lugar, la tienda pregunta quién va (asistentes).
   preventa: false,
-  asistencia: 0.6 // parte de los confirmados que se cree que llega, si no se ha guardado otra en la pestaña Dogstar
+  margen: 0.2 // lo que se lleva de más sobre lo que dicen los confirmados, por si acaso (se cambia en la pestaña Dogstar)
 };
 // La tienda pregunta "¿Vas a ir?" hasta que termina el día del evento
 export function confirmarAbierto(ahora = new Date()) {
