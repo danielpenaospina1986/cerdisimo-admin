@@ -6,7 +6,7 @@ import { crearStore, modoPrueba } from "./datos.js";
 import {
   PRODUCTOS, precios, calcularPedido, hoyISO, fechaLarga, plata, enlaceWhatsApp,
   ESTADOS, CORTE, viernesParaPedidoWeb, corteDe, venceAlCorte, codigoPedido,
-  EVENTO, esDelEvento, preventaAbierta
+  EVENTO, esDelEvento, preventaAbierta, confirmarAbierto
 } from "../negocio.js";
 
 const $ = (s) => document.querySelector(s);
@@ -17,6 +17,8 @@ let store, usuario = null, ficha = null, pedidos = [], config = null;
 let visitante = false, tienda = null, escuchandoTienda = false;
 const cantidades = {};
 let choripanes = 0;
+// Confirmación de asistencia a La Chorizada Real
+let asistencia = null, asisCargada = false, asisN = 1, asisEditando = false;
 const ui = { vista: "pedir", pagando: null, retomar: false, errorEnlace: "", cargados: { ficha: false, pedidos: false, precios: false } };
 const enInstagram = /Instagram|FBAN|FBAV|FB_IAB/i.test(navigator.userAgent);
 
@@ -62,7 +64,7 @@ function aplicarCarrito(c) {
     const n = Math.floor(Number(c.items && c.items[x.id]) || 0);
     if (n > 0 && n <= 50) cantidades[x.id] = n;
   });
-  choripanes = Math.max(0, Math.min(20, Math.floor(Number(c.choripanes) || 0)));
+  choripanes = preventaAbierta() ? Math.max(0, Math.min(20, Math.floor(Number(c.choripanes) || 0))) : 0;
   if (c.recoge) $('input[name="recibe"][value="recoge"]').checked = true;
   if (typeof c.notas === "string") $("#pedir-notas").value = c.notas.slice(0, 200);
   return hayCarrito();
@@ -123,8 +125,11 @@ function pintarLogin() {
   const partes = [];
   if (c.paquetes) partes.push(c.resumen + " por " + plata(c.total));
   if (choripanes) partes.push(choripanes + (choripanes === 1 ? " choripán" : " choripanes") + " de preventa por " + plata(choripanes * P().precioChoripan));
-  $("#login-carrito").hidden = !partes.length;
-  $("#login-carrito").innerHTML = "<strong>Tu pedido:</strong> " + esc(partes.join(" y ")) + ". Queda guardado mientras entras.";
+  const asis = leerAsisPendiente();
+  $("#login-carrito").hidden = !partes.length && !asis;
+  $("#login-carrito").innerHTML = partes.length
+    ? "<strong>Tu pedido:</strong> " + esc(partes.join(" y ")) + ". Queda guardado mientras entras."
+    : "<strong>La Chorizada Real:</strong> entra y quedas en la lista con " + asis.choripanes + (asis.choripanes === 1 ? " choripán" : " choripanes") + ".";
   $("#login-instagram").hidden = !enInstagram;
 }
 
@@ -169,6 +174,13 @@ async function entrar(u) {
   }
   $("#salir").hidden = false;
   $("#salir").onclick = () => store.salir();
+  store.escucharAsistencia(u.uid, (a) => {
+    asistencia = a; asisCargada = true;
+    if (a && !asisEditando) asisN = Number(a.choripanes) || 0;
+    confirmarPendiente();
+    if (!$("#cargando").hidden) return;
+    pintarAsis();
+  });
   store.escucharPrecios((c) => { config = c; ui.cargados.precios = true; listo(); });
   store.escucharFicha(u.uid, (f) => { ficha = f; ui.cargados.ficha = true; listo(); });
   store.escucharPedidos(u.uid, (ps) => {
@@ -191,7 +203,7 @@ function listo() {
     primeraVez = false;
     // Si eligió algo antes de entrar, sigue con ese pedido (después de llenar sus datos, si es nuevo)
     ui.retomar = hayCarrito();
-    if (!ficha) ui.vista = "datos";
+    if (!ficha) ui.vista = ui.retomar ? "datos" : "pedir";
     else if (ui.retomar) ui.vista = "pedir";
     else if (pedidos.some((p) => p.estado === "por_pagar" || p.estado === "rechazado")) ui.vista = "mis";
     else ui.vista = "pedir";
@@ -218,7 +230,8 @@ function pintar() {
     return;
   }
   if (ui.vista === "login") ui.vista = "pedir";
-  if (!ficha && ui.vista !== "datos") ui.vista = "datos";
+  // Sin ficha se puede ver la tienda y confirmar asistencia; para pedir o ver pedidos van primero sus datos
+  if (!ficha && ui.vista !== "datos" && ui.vista !== "pedir") ui.vista = "datos";
   const tab = ui.vista === "pagar" ? "mis" : ui.vista;
   document.querySelectorAll("#pestanas button").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.vista === tab)));
   mostrar(ui.vista);
@@ -246,6 +259,7 @@ function pintarPedir() {
     fechaLarga(isoDe(corteDe(v))) + " a las 12 m.";
   pintarProductos();
   pintarEvento();
+  pintarAsis();
 }
 const isoDe = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 
@@ -311,6 +325,7 @@ $("#f-pedir").addEventListener("submit", async (e) => {
   const calc = calcularPedido(items, P(), recoge());
   if (!calc.paquetes) { err.textContent = "Agrega al menos un producto."; return; }
   if (!usuario) { guardarCarrito(); irAEntrar(); return; }
+  if (!ficha) { guardarCarrito(); ui.retomar = true; ui.vista = "datos"; pintar(); window.scrollTo(0, 0); return; }
   if (!recoge() && !ficha.direccion) { err.textContent = "Agrega tu dirección en Mis datos o elige recogerlo."; return; }
   const btn = $("#pedir-btn"); btn.disabled = true;
   try {
@@ -389,6 +404,121 @@ $("#f-evento").addEventListener("submit", async (e) => {
 });
 
 // =====================================================================
+// ¿Vas a ir a La Chorizada Real? (asistentes/{uid}). Sin precio: el choripán se vende allá.
+// =====================================================================
+const LLAVE_ASIS = "cerdisimo-asistencia";
+function leerAsisPendiente() {
+  try {
+    const a = JSON.parse(localStorage.getItem(LLAVE_ASIS));
+    return a && Date.now() - new Date(a.guardado).getTime() < 864e5 ? a : null;
+  } catch (e) { return null; }
+}
+function guardarAsisPendiente(n) {
+  try { localStorage.setItem(LLAVE_ASIS, JSON.stringify({ choripanes: n, guardado: new Date().toISOString() })); } catch (e) { /* nada */ }
+}
+const borrarAsisPendiente = () => { try { localStorage.removeItem(LLAVE_ASIS); } catch (e) { /* nada */ } };
+const choris = (n) => n + (n === 1 ? " choripán" : " choripanes");
+
+function nombreDe(u) {
+  return ((ficha && ficha.nombre) || u.displayName || (u.email || "").split("@")[0] || "Sin nombre").slice(0, 80);
+}
+async function guardarAsis(n, va) {
+  const ahora = new Date().toISOString();
+  await store.guardarAsistencia(usuario.uid, {
+    evento: EVENTO.id, nombre: nombreDe(usuario), email: (usuario.email || "").slice(0, 120),
+    choripanes: n, va, autorizaDatos: true,
+    creadoEn: (asistencia && asistencia.creadoEn) || ahora, actualizadoEn: ahora
+  });
+}
+// Si tocó "¡Sí, voy!" antes de entrar, al volver queda en la lista
+let confirmando = false;
+async function confirmarPendiente() {
+  const pend = leerAsisPendiente();
+  if (!pend || !usuario || !asisCargada || confirmando) return;
+  confirmando = true;
+  try {
+    asisN = Math.max(0, Math.min(20, Number(pend.choripanes) || 0));
+    await guardarAsis(asisN, true);
+    borrarAsisPendiente();
+    if (ui.vista !== "pedir") { ui.vista = "pedir"; pintar(); }
+    setTimeout(() => $("#asis-caja").scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+  } catch (x) {
+    $("#asis-error").textContent = explicar(x, "guardarte en la lista");
+  } finally { confirmando = false; }
+}
+
+function pintarAsis() {
+  const caja = $("#asis-caja");
+  const abierto = confirmarAbierto();
+  caja.hidden = !abierto || (usuario && !asisCargada);
+  if (caja.hidden) return;
+  const va = !!asistencia && asistencia.va !== false;
+  const noVa = !!asistencia && asistencia.va === false;
+  caja.classList.toggle("listo", va && !asisEditando);
+  $("#asis-n").textContent = asisN;
+  $("#asis-prod").classList.toggle("activo", asisN > 0);
+  $("#asis-permiso-l").hidden = !!asistencia;
+  $("#asis-no").hidden = !va;
+  const intro = "Viernes 20 de noviembre en Dogstar (Medellín), de " + EVENTO.horario +
+    " La entrada es libre. Cerramos el año, abrimos la temporada navideña y celebramos los 40 del Dapo.";
+  if (va) {
+    const cambio = asisN !== (Number(asistencia.choripanes) || 0);
+    $("#asis-t").textContent = "¡Estás en la lista!";
+    $("#asis-p").textContent = "Te esperamos el viernes 20 de noviembre en Dogstar, desde las " + EVENTO.desde +
+      " Contamos " + choris(Number(asistencia.choripanes) || 0) + " para ti. Si cambia, ajústalo aquí.";
+    $("#asis-btn").textContent = "Guardar cambio";
+    $("#asis-btn").hidden = !cambio;
+    $("#asis-nota").hidden = true;
+  } else {
+    $("#asis-t").textContent = noVa ? "¿Cambiaste de idea?" : "¿Vas a ir a La Chorizada Real?";
+    $("#asis-p").textContent = noVa ? "Marcaste que no puedes ir. Si al final sí vas, avísanos aquí. " + intro : intro;
+    $("#asis-btn").textContent = "¡Sí, voy!";
+    $("#asis-btn").hidden = false;
+    $("#asis-nota").hidden = !!usuario;
+  }
+}
+
+$("#f-asis").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-paso-asis]");
+  if (!b) return;
+  asisN = Math.max(0, Math.min(20, asisN + Number(b.dataset.pasoAsis)));
+  asisEditando = !!asistencia;
+  pintarAsis();
+});
+
+$("#f-asis").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = $("#asis-error");
+  err.textContent = "";
+  if (!asistencia && !$("#asis-permiso").checked) { err.textContent = "Marca la casilla para poder guardarte en la lista."; return; }
+  if (!usuario) {
+    guardarAsisPendiente(asisN);
+    // En el navegador de Instagram Google no deja entrar: se ofrece el enlace al correo
+    if (enInstagram) { irAEntrar(); return; }
+    try { await store.entrarConGoogle(); }
+    catch (x) {
+      if (x.code === "auth/popup-closed-by-user" || x.code === "auth/cancelled-popup-request") return;
+      irAEntrar();
+      $("#login-error").textContent = explicar(x, "entrar con Google");
+    }
+    return;
+  }
+  const btn = $("#asis-btn"); btn.disabled = true;
+  try {
+    await guardarAsis(asisN, true);
+    asisEditando = false;
+  } catch (x) {
+    err.textContent = explicar(x, "guardarte en la lista");
+  } finally { btn.disabled = false; pintarAsis(); }
+});
+
+$("#asis-no").onclick = async () => {
+  if (!confirm("¿Seguro que ya no puedes ir? Te sacamos de la lista.")) return;
+  try { await guardarAsis(Number(asistencia.choripanes) || 0, false); asisEditando = false; }
+  catch (x) { $("#asis-error").textContent = explicar(x, "guardar el cambio"); }
+};
+
+// =====================================================================
 // Pagar
 // =====================================================================
 function irAPagar(id) { ui.pagando = id; ui.vista = "pagar"; pintar(); window.scrollTo(0, 0); }
@@ -422,7 +552,7 @@ function pintarPagar() {
   } else wa.hidden = true;
   $("#pagar-corte").textContent = "Si no pagas antes del " +
     (esDelEvento(p) ? fechaLarga(EVENTO.cierre) + " " + EVENTO.cierreTexto : fechaLarga(isoDe(corteDe(p.fechaEntrega))) + " a las 12 m.") + ", el pedido se cancela solo. " +
-    (esDelEvento(p) ? "Igual puedes comprar tu choripán en la carpa a " + plata(cfg.precioChoripanSitio) + "." : "Si prefieres pagar contra entrega, pídelo por WhatsApp.");
+    (esDelEvento(p) ? "Igual puedes comprar tu choripán en la carpa." : "Si prefieres pagar contra entrega, pídelo por WhatsApp.");
 }
 
 $("#f-pagar").addEventListener("submit", async (e) => {

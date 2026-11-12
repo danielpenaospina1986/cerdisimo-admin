@@ -226,7 +226,23 @@
       </div>
       <div class="chips" id="ev-resumen"></div>
 
-      <h2 class="seccion">Preventas: quién reclama</h2>
+      <h2 class="seccion">Quién dice que va</h2>
+      <p class="nota">Lo confirman desde la tienda con su cuenta de Google y dicen cuántos choripanes creen que se comen.</p>
+      <div class="chips" id="as-resumen"></div>
+      <form class="fila-btn" id="f-asistencia">
+        <label class="etq">Por si acaso, llevar este % de más
+          <input class="campo" id="as-pct" inputmode="numeric">
+        </label>
+        <button class="btn btn-sec btn-chico">Guardar</button>
+      </form>
+      <p id="as-sugerido"></p>
+      <button class="btn btn-chico" id="as-usar" type="button" hidden>Llevar estos choripanes</button>
+      <p class="nota">El botón cambia «Choripanes que vamos a llevar» abajo, y con eso se calculan pan, salsas y carbón.</p>
+      <input class="campo" id="as-buscar" type="search" placeholder="Buscar por nombre o correo" autocomplete="off">
+      <div class="tabla-caja"><table class="tabla" id="as-lista"></table></div>
+      <button class="btn btn-sec btn-chico" id="as-csv" type="button" hidden>Descargar la lista (Excel)</button>
+
+      <h2 class="seccion" id="ev-prev-t">Preventas: quién reclama</h2>
       <input class="campo" id="ev-buscar" type="search" placeholder="Buscar por nombre, correo o código (CC-…)" autocomplete="off">
       <div class="lista" id="ev-lista"></div>
 

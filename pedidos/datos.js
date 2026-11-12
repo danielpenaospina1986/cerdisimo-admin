@@ -53,6 +53,14 @@ function storeLocal() {
     },
     async actualizarPedido(id, cambios) {
       escribir((d) => { const p = d.pedidos.find((x) => x.id === id); if (p) Object.assign(p, cambios); });
+    },
+    escucharAsistencia(uid, cb) { escuchar((d) => cb((d.asistentes || []).find((a) => a.id === uid) || null)); },
+    async guardarAsistencia(uid, doc) {
+      escribir((d) => {
+        d.asistentes = d.asistentes || [];
+        const i = d.asistentes.findIndex((a) => a.id === uid);
+        if (i >= 0) d.asistentes[i] = { ...d.asistentes[i], ...doc }; else d.asistentes.push({ ...doc, id: uid });
+      });
     }
   };
 }
@@ -112,6 +120,11 @@ async function storeFirebase() {
     },
     async guardarFicha(uid, ficha) { await fs.setDoc(fs.doc(db, "clientes", uid), ficha, { merge: true }); },
     async crearPedido(p) { const ref = await fs.addDoc(fs.collection(db, "pedidos"), p); return ref.id; },
-    async actualizarPedido(id, cambios) { await fs.updateDoc(fs.doc(db, "pedidos", id), cambios); }
+    async actualizarPedido(id, cambios) { await fs.updateDoc(fs.doc(db, "pedidos", id), cambios); },
+    // Confirmación de asistencia a La Chorizada Real: asistentes/{uid}
+    escucharAsistencia(uid, cb) {
+      fs.onSnapshot(fs.doc(db, "asistentes", uid), (s) => cb(s.exists() ? { ...s.data(), id: s.id } : null), (e) => { console.warn(e); cb(null); });
+    },
+    async guardarAsistencia(uid, doc) { await fs.setDoc(fs.doc(db, "asistentes", uid), doc, { merge: true }); }
   };
 }

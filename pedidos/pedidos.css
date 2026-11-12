@@ -66,6 +66,19 @@ main { max-width: 620px; }
 .evento-precio span { font: 400 24px/1 var(--font-display); color: var(--rust-deep); }
 .evento-precio small { font-weight: 600; }
 .evento .total { margin: 12px 0 0; }
+/* ¿Vas a ir a La Chorizada Real? */
+.asis { margin: 0 0 16px; background: var(--paper); border: var(--stroke-lg) solid var(--ink); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); overflow: hidden; }
+.asis-cab { padding: 12px 16px; background: var(--rust-deep); color: var(--paper); border-bottom: var(--stroke-md) solid var(--ink); }
+.asis-eyebrow { margin: 0 0 4px; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--mustard); }
+.asis-t { margin: 0; font: 400 24px/1.1 var(--font-display); letter-spacing: .02em; }
+.asis-cuerpo { padding: 14px 16px 16px; display: grid; gap: 12px; }
+.asis-p { margin: 0; }
+.asis-permiso { font-size: 14px; line-height: 1.35; align-items: flex-start; }
+.asis-nota { margin: -4px 0 0; font-size: 14px; text-align: center; }
+.asis-no { justify-self: center; background: none; border: 0; padding: 4px; font: 700 14px/1.2 var(--font-body); color: var(--ink); text-decoration: underline; cursor: pointer; }
+.asis .error:empty { display: none; }
+.asis.listo .asis-cab { background: var(--pagado); }
+.asis-permiso input { margin-top: 3px; flex: none; }
 
 /* Productos: precio en letra de etiqueta, botones de 44 px para el dedo y la promo siempre en mostaza */
 .productos { gap: 12px; }

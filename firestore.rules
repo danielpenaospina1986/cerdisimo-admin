@@ -63,6 +63,24 @@ service cloud.firestore {
              .hasOnly(['estado', 'comprobante', 'reportadoEn', 'canceladoEn', 'canceladoPor']);
     }
 
+    // Quién va a La Chorizada Real (un documento por cuenta, con su uid como ID).
+    // Cada quien confirma, cambia sus choripanes o dice que ya no va; solo los socios ven la lista.
+    match /asistentes/{uid} {
+      allow read, write: if esSocio();
+      allow read: if esCliente(uid);
+      allow create, update: if esCliente(uid)
+        && request.resource.data.keys().hasOnly(['evento', 'nombre', 'email', 'choripanes', 'va',
+                                                  'autorizaDatos', 'creadoEn', 'actualizadoEn'])
+        && request.resource.data.evento == 'dogstar-2026-11'
+        && request.resource.data.autorizaDatos == true
+        && request.resource.data.va is bool
+        && request.resource.data.choripanes is int
+        && request.resource.data.choripanes >= 0 && request.resource.data.choripanes <= 20
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() > 0 && request.resource.data.nombre.size() <= 80
+        && request.resource.data.email is string && request.resource.data.email.size() <= 120;
+    }
+
     match /movimientos/{id} { allow read, write: if esSocio(); }
 
     match /config/{id} {
