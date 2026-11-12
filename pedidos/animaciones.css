@@ -30,6 +30,18 @@
   /* Con algo en el pedido, el botón para comprar baila cada tanto, como en las caricaturas.
      Va antes de las demás clases para que el rebote y el "no" le ganen. */
   :where(#pedir-btn, #evento-btn):not(:disabled) { animation: cc-baile 4.2s steps(2, end) 1s infinite; }
+  /* ¡Sí, voy! no se queda quieto: baila más seguido y su luz verde late, como un aviso de neón */
+  :where(#asis-btn):not(:disabled) { animation: cc-baile 2.4s steps(2, end) .5s infinite, cc-neon 1.2s ease-in-out infinite alternate; }
+  @keyframes cc-neon {
+    from { box-shadow: var(--shadow-md), 0 0 6px rgba(95,224,42,.35); }
+    to   { box-shadow: var(--shadow-md), 0 0 22px rgba(95,224,42,.9), 0 0 40px rgba(95,224,42,.45); }
+  }
+  /* El letrero de neón de abajo parpadea de vez en cuando */
+  .asis-nota { animation: cc-parpadeo 5s steps(1, end) infinite; }
+  @keyframes cc-parpadeo {
+    0%, 91%, 94%, 100% { opacity: 1; }
+    92%, 95%           { opacity: .55; }
+  }
   @keyframes cc-baile {
     0%, 32%, 100% { translate: 0 0;    scale: 1 1;       rotate: 0deg; }
     5%            { translate: 0 -9px; scale: .98 1.07;  rotate: -2.5deg; }

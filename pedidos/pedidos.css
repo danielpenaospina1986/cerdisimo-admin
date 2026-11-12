@@ -82,7 +82,7 @@ main { max-width: 620px; }
 .asis-permiso { font-size: 14px; line-height: 1.35; align-items: flex-start; }
 .asis-permiso input { margin-top: 3px; flex: none; accent-color: var(--llama); }
 .asis .btn-grande { background: var(--llama); color: var(--ink); }
-.asis-nota { margin: -4px 0 0; font-size: 14px; text-align: center; color: #e9dcc6; }
+.asis-nota { margin: -2px 0 0; font-size: 15px; font-weight: 800; text-align: center; color: #e4ffd2; text-shadow: 0 0 3px #5fe02a, 0 0 9px #5fe02a, 0 0 18px #3fcf1a, 0 0 30px #2fa512; }
 .asis-no { justify-self: center; background: none; border: 0; padding: 4px; font: 700 14px/1.2 var(--font-body); color: #fff8ec; text-decoration: underline; cursor: pointer; }
 .asis .error { color: #ff8a7a; }
 .asis .error:empty { display: none; }

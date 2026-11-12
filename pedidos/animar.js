@@ -1,7 +1,7 @@
 // Movimiento de caricatura para los botones de la tienda.
 // Este archivo solo pone y quita clases; cómo se mueve cada cosa está en animaciones.css.
 const BOTON = ".btn, .btn-mini, .stepper button, .pestanas button, .franja-evento summary";
-const PASO = "[data-paso], [data-paso-evento]";
+const PASO = "[data-paso], [data-paso-evento], [data-paso-asis]";
 const quieto = matchMedia("(prefers-reduced-motion: reduce)");
 
 // En iPhone, :active (el botón aplastado) solo se ve si la página escucha los toques
@@ -36,7 +36,7 @@ document.addEventListener("click", (e) => {
   if (!b.matches(PASO)) return;
   const out = b.parentElement.querySelector("output");
   if (out.textContent === antes) { animar(out, "nono"); return; } // ya no baja de 0 ni sube del tope
-  const suma = Number(b.dataset.paso || b.dataset.pasoEvento) > 0;
+  const suma = Number(b.dataset.paso || b.dataset.pasoEvento || b.dataset.pasoAsis) > 0;
   animar(out, suma ? "sube" : "baja");
   const prod = b.closest(".prod");
   if (suma && out.textContent === "1") animar(prod, "menea");
