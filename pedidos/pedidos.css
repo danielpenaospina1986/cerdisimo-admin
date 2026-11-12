@@ -67,14 +67,14 @@ main { max-width: 620px; }
 .evento-precio small { font-weight: 600; }
 .evento .total { margin: 12px 0 0; }
 /* ¿Vas a ir a La Chorizada Real? Evento especial: negro con llamas verdes, como Dogstar */
-.asis { --llama: #5fe02a; margin: 0 0 16px; background: #0d0b0a; color: #fff8ec; border: var(--stroke-lg) solid var(--ink); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); overflow: hidden; }
-.asis-cab { position: relative; padding: 16px 16px 26px; text-align: center; background: url("../assets/llamas.svg") bottom / 100% 55% no-repeat, radial-gradient(ellipse at 50% 120%, rgba(95,224,42,.35), transparent 65%), #0d0b0a; }
+.asis { --llama: #5fe02a; margin: 0 0 16px; background: #170f07; color: #fff8ec; border: var(--stroke-lg) solid var(--ink); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); overflow: hidden; }
+.asis-cab { position: relative; padding: 16px 16px 26px; text-align: center; padding-bottom: 34px; background: linear-gradient(#170f07 0, rgba(23,15,7,0) 38%) bottom / 100% 130px no-repeat, url("../assets/llamas-flyer.jpg") bottom / 100% 130px no-repeat, #170f07; }
 .asis-logos { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
 .asis-logos img { height: 92px; width: auto; filter: drop-shadow(0 0 10px rgba(0,0,0,.8)); }
 .asis-logos img + .asis-x + img { height: 96px; }
 .asis-x { font: 400 26px/1 var(--font-display); color: var(--llama); }
-.asis-eyebrow { margin: 0 0 4px; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--llama); }
-.asis-t { margin: 0; font: 400 26px/1.1 var(--font-display); letter-spacing: .02em; color: #fff8ec; text-shadow: 2px 2px 0 #000, 0 0 14px rgba(95,224,42,.55); }
+.asis-eyebrow { margin: 0 0 4px; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #fff8ec; text-shadow: 1px 1px 0 #000, 0 0 6px #000, 0 0 3px #000; }
+.asis-t { margin: 0; font: 400 26px/1.1 var(--font-display); letter-spacing: .02em; color: #fff8ec; -webkit-text-stroke: 1px #000; text-shadow: 2px 3px 0 #000, 0 0 10px #000; }
 .asis-cuerpo { padding: 14px 16px 16px; display: grid; gap: 12px; border-top: 2px solid var(--llama); }
 .asis-p { margin: 0; }
 .asis .prod { color: var(--ink); }
